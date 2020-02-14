@@ -1,11 +1,9 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
 import Polygon from '../src/ol/geom/Polygon.js';
-import Draw from '../src/ol/interaction/Draw.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import VectorLayer from '../src/ol/layer/Vector.js';
-import OSM from '../src/ol/source/OSM.js';
-import VectorSource from '../src/ol/source/Vector.js';
+import Draw, {createRegularPolygon, createBox} from '../src/ol/interaction/Draw.js';
+import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
+import {OSM, Vector as VectorSource} from '../src/ol/source.js';
 
 const raster = new TileLayer({
   source: new OSM()
@@ -35,16 +33,13 @@ function addInteraction() {
     let geometryFunction;
     if (value === 'Square') {
       value = 'Circle';
-      geometryFunction = Draw.createRegularPolygon(4);
+      geometryFunction = createRegularPolygon(4);
     } else if (value === 'Box') {
       value = 'Circle';
-      geometryFunction = Draw.createBox();
+      geometryFunction = createBox();
     } else if (value === 'Star') {
       value = 'Circle';
       geometryFunction = function(coordinates, geometry) {
-        if (!geometry) {
-          geometry = new Polygon(null);
-        }
         const center = coordinates[0];
         const last = coordinates[1];
         const dx = center[0] - last[0];
@@ -61,7 +56,11 @@ function addInteraction() {
           newCoordinates.push([center[0] + offsetX, center[1] + offsetY]);
         }
         newCoordinates.push(newCoordinates[0].slice());
-        geometry.setCoordinates([newCoordinates]);
+        if (!geometry) {
+          geometry = new Polygon([newCoordinates]);
+        } else {
+          geometry.setCoordinates([newCoordinates]);
+        }
         return geometry;
       };
     }

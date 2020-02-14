@@ -58,7 +58,8 @@ describe('ol.style.Text', function() {
         }),
         backgroundStroke: new Stroke({
           color: 'black'
-        })
+        }),
+        padding: [10, 11, 12, 13]
       });
       const clone = original.clone();
       expect(original.getFont()).to.eql(clone.getFont());
@@ -74,6 +75,7 @@ describe('ol.style.Text', function() {
       expect(original.getFill().getColor()).to.eql(clone.getFill().getColor());
       expect(original.getBackgroundStroke().getColor()).to.eql(clone.getBackgroundStroke().getColor());
       expect(original.getBackgroundFill().getColor()).to.eql(clone.getBackgroundFill().getColor());
+      expect(original.getPadding()).to.eql(clone.getPadding());
     });
 
     it('the clone does not reference the same objects as the original', function() {
@@ -95,6 +97,15 @@ describe('ol.style.Text', function() {
       expect(original.getStroke().getColor()).to.not.eql(clone.getStroke().getColor());
     });
 
+  });
+
+  describe('#setRotateWithView', function() {
+    it('sets the rotateWithView property', function() {
+      const textStyle = new Text();
+      expect(textStyle.getRotateWithView()).to.eql(undefined);
+      textStyle.setRotateWithView(true);
+      expect(textStyle.getRotateWithView()).to.eql(true);
+    });
   });
 
 });

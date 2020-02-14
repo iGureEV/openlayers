@@ -1,56 +1,47 @@
 /**
  * @module ol/render/Event
  */
-import {inherits} from '../index.js';
+
 import Event from '../events/Event.js';
 
-/**
- * @constructor
- * @extends {ol.events.Event}
- * @implements {oli.render.Event}
- * @param {ol.render.EventType} type Type.
- * @param {ol.render.VectorContext=} opt_vectorContext Vector context.
- * @param {olx.FrameState=} opt_frameState Frame state.
- * @param {?CanvasRenderingContext2D=} opt_context Context.
- * @param {?ol.webgl.Context=} opt_glContext WebGL Context.
- */
-const RenderEvent = function(
-  type, opt_vectorContext, opt_frameState, opt_context,
-  opt_glContext) {
-
-  Event.call(this, type);
+class RenderEvent extends Event {
 
   /**
-   * For canvas, this is an instance of {@link ol.render.canvas.Immediate}.
-   * @type {ol.render.VectorContext|undefined}
-   * @api
+   * @param {import("./EventType.js").default} type Type.
+   * @param {import("../transform.js").Transform=} opt_inversePixelTransform Transform for
+   *     CSS pixels to rendered pixels.
+   * @param {import("../PluggableMap.js").FrameState=} opt_frameState Frame state.
+   * @param {?CanvasRenderingContext2D=} opt_context Context.
    */
-  this.vectorContext = opt_vectorContext;
+  constructor(type, opt_inversePixelTransform, opt_frameState, opt_context) {
 
-  /**
-   * An object representing the current render frame state.
-   * @type {olx.FrameState|undefined}
-   * @api
-   */
-  this.frameState = opt_frameState;
+    super(type);
 
-  /**
-   * Canvas context. Only available when a Canvas renderer is used, null
-   * otherwise.
-   * @type {CanvasRenderingContext2D|null|undefined}
-   * @api
-   */
-  this.context = opt_context;
+    /**
+     * Transform from CSS pixels (relative to the top-left corner of the map viewport)
+     * to rendered pixels on this event's `context`.
+     * @type {import("../transform.js").Transform|undefined}
+     * @api
+     */
+    this.inversePixelTransform = opt_inversePixelTransform;
 
-  /**
-   * WebGL context. Only available when a WebGL renderer is used, null
-   * otherwise.
-   * @type {ol.webgl.Context|null|undefined}
-   * @api
-   */
-  this.glContext = opt_glContext;
+    /**
+     * An object representing the current render frame state.
+     * @type {import("../PluggableMap.js").FrameState|undefined}
+     * @api
+     */
+    this.frameState = opt_frameState;
 
-};
+    /**
+     * Canvas context. Not available when the event is dispatched by the map. Only available
+     * when a Canvas renderer is used, null otherwise.
+     * @type {CanvasRenderingContext2D|null|undefined}
+     * @api
+     */
+    this.context = opt_context;
 
-inherits(RenderEvent, Event);
+  }
+
+}
+
 export default RenderEvent;

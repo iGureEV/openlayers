@@ -3,14 +3,10 @@ import View from '../src/ol/View.js';
 import MVT from '../src/ol/format/MVT.js';
 import VectorTileLayer from '../src/ol/layer/VectorTile.js';
 import VectorTileSource from '../src/ol/source/VectorTile.js';
-import Fill from '../src/ol/style/Fill.js';
-import Icon from '../src/ol/style/Icon.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
-import Text from '../src/ol/style/Text.js';
+import {Fill, Icon, Stroke, Style, Text} from '../src/ol/style.js';
 
 
-const key = 'pk.eyJ1IjoiYWhvY2V2YXIiLCJhIjoiRk1kMWZaSSJ9.E5BkluenyWQMsBLsuByrmg';
+const key = 'pk.eyJ1IjoiYWhvY2V2YXIiLCJhIjoiY2pzbmg0Nmk5MGF5NzQzbzRnbDNoeHJrbiJ9.7_-_gL8ur7ZtEiNwRfCy7Q';
 
 const map = new Map({
   layers: [

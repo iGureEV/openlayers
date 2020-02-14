@@ -1,294 +1,353 @@
 /**
  * @module ol/interaction/Translate
  */
-import {inherits} from '../index.js';
 import Collection from '../Collection.js';
-import BaseObject from '../Object.js';
-import {listen} from '../events.js';
+import {getChangeEventType} from '../Object.js';
 import Event from '../events/Event.js';
 import {TRUE} from '../functions.js';
 import {includes} from '../array.js';
-import PointerInteraction from '../interaction/Pointer.js';
-import InteractionProperty from '../interaction/Property.js';
-import TranslateEventType from '../interaction/TranslateEventType.js';
+import PointerInteraction from './Pointer.js';
+import InteractionProperty from './Property.js';
+
+
+/**
+ * @enum {string}
+ */
+const TranslateEventType = {
+  /**
+   * Triggered upon feature translation start.
+   * @event TranslateEvent#translatestart
+   * @api
+   */
+  TRANSLATESTART: 'translatestart',
+  /**
+   * Triggered upon feature translation.
+   * @event TranslateEvent#translating
+   * @api
+   */
+  TRANSLATING: 'translating',
+  /**
+   * Triggered upon feature translation end.
+   * @event TranslateEvent#translateend
+   * @api
+   */
+  TRANSLATEEND: 'translateend'
+};
+
+/**
+ * A function that takes an {@link module:ol/Feature} or
+ * {@link module:ol/render/Feature} and an
+ * {@link module:ol/layer/Layer} and returns `true` if the feature may be
+ * translated or `false` otherwise.
+ * @typedef {function(import("../Feature.js").FeatureLike, import("../layer/Layer.js").default):boolean} FilterFunction
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {Collection<import("../Feature.js").default>} [features] Only features contained in this collection will be able to be translated. If
+ * not specified, all features on the map will be able to be translated.
+ * @property {Array<import("../layer/Layer.js").default>|function(import("../layer/Layer.js").default): boolean} [layers] A list of layers from which features should be
+ * translated. Alternatively, a filter function can be provided. The
+ * function will be called for each layer in the map and should return
+ * `true` for layers that you want to be translatable. If the option is
+ * absent, all visible layers will be considered translatable.
+ * @property {FilterFunction} [filter] A function
+ * that takes an {@link module:ol/Feature} and an
+ * {@link module:ol/layer/Layer} and returns `true` if the feature may be
+ * translated or `false` otherwise.
+ * @property {number} [hitTolerance=0] Hit-detection tolerance. Pixels inside the radius around the given position
+ * will be checked for features.
+ */
+
+
+/**
+ * @classdesc
+ * Events emitted by {@link module:ol/interaction/Translate~Translate} instances
+ * are instances of this type.
+ */
+export class TranslateEvent extends Event {
+  /**
+   * @param {TranslateEventType} type Type.
+   * @param {Collection<import("../Feature.js").default>} features The features translated.
+   * @param {import("../coordinate.js").Coordinate} coordinate The event coordinate.
+   * @param {import("../coordinate.js").Coordinate} startCoordinate The original coordinates before.translation started
+   * @param {import("../MapBrowserEvent.js").default} mapBrowserEvent Map browser event.
+   */
+  constructor(type, features, coordinate, startCoordinate, mapBrowserEvent) {
+
+    super(type);
+
+    /**
+     * The features being translated.
+     * @type {Collection<import("../Feature.js").default>}
+     * @api
+     */
+    this.features = features;
+
+    /**
+     * The coordinate of the drag event.
+     * @const
+     * @type {import("../coordinate.js").Coordinate}
+     * @api
+     */
+    this.coordinate = coordinate;
+
+    /**
+     * The coordinate of the start position before translation started.
+     * @const
+     * @type {import("../coordinate.js").Coordinate}
+     * @api
+     */
+    this.startCoordinate = startCoordinate;
+
+    /**
+     * Associated {@link module:ol/MapBrowserEvent}.
+     * @type {import("../MapBrowserEvent.js").default}
+     * @api
+     */
+    this.mapBrowserEvent = mapBrowserEvent;
+
+  }
+
+}
+
 
 /**
  * @classdesc
  * Interaction for translating (moving) features.
  *
- * @constructor
- * @extends {ol.interaction.Pointer}
- * @fires ol.interaction.Translate.Event
- * @param {olx.interaction.TranslateOptions=} opt_options Options.
+ * @fires TranslateEvent
  * @api
  */
-const Translate = function(opt_options) {
-  PointerInteraction.call(this, {
-    handleDownEvent: handleDownEvent,
-    handleDragEvent: handleDragEvent,
-    handleMoveEvent: handleMoveEvent,
-    handleUpEvent: handleUpEvent
-  });
-
-  const options = opt_options ? opt_options : {};
-
+class Translate extends PointerInteraction {
   /**
-   * The last position we translated to.
-   * @type {ol.Coordinate}
-   * @private
+   * @param {Options=} opt_options Options.
    */
-  this.lastCoordinate_ = null;
+  constructor(opt_options) {
+    const options = opt_options ? opt_options : {};
 
+    super(/** @type {import("./Pointer.js").Options} */ (options));
 
-  /**
-   * @type {ol.Collection.<ol.Feature>}
-   * @private
-   */
-  this.features_ = options.features !== undefined ? options.features : null;
-
-  /** @type {function(ol.layer.Layer): boolean} */
-  let layerFilter;
-  if (options.layers) {
-    if (typeof options.layers === 'function') {
-      layerFilter = options.layers;
-    } else {
-      const layers = options.layers;
-      layerFilter = function(layer) {
-        return includes(layers, layer);
-      };
-    }
-  } else {
-    layerFilter = TRUE;
-  }
-
-  /**
-   * @private
-   * @type {function(ol.layer.Layer): boolean}
-   */
-  this.layerFilter_ = layerFilter;
-
-  /**
-   * @private
-   * @type {number}
-   */
-  this.hitTolerance_ = options.hitTolerance ? options.hitTolerance : 0;
-
-  /**
-   * @type {ol.Feature}
-   * @private
-   */
-  this.lastFeature_ = null;
-
-  listen(this,
-    BaseObject.getChangeEventType(InteractionProperty.ACTIVE),
-    this.handleActiveChanged_, this);
-
-};
-
-inherits(Translate, PointerInteraction);
-
-
-/**
- * @param {ol.MapBrowserPointerEvent} event Event.
- * @return {boolean} Start drag sequence?
- * @this {ol.interaction.Translate}
- */
-function handleDownEvent(event) {
-  this.lastFeature_ = this.featuresAtPixel_(event.pixel, event.map);
-  if (!this.lastCoordinate_ && this.lastFeature_) {
-    this.lastCoordinate_ = event.coordinate;
-    handleMoveEvent.call(this, event);
-
-    const features = this.features_ || new Collection([this.lastFeature_]);
-
-    this.dispatchEvent(
-      new Translate.Event(
-        TranslateEventType.TRANSLATESTART, features,
-        event.coordinate));
-    return true;
-  }
-  return false;
-}
-
-
-/**
- * @param {ol.MapBrowserPointerEvent} event Event.
- * @return {boolean} Stop drag sequence?
- * @this {ol.interaction.Translate}
- */
-function handleUpEvent(event) {
-  if (this.lastCoordinate_) {
+    /**
+     * The last position we translated to.
+     * @type {import("../coordinate.js").Coordinate}
+     * @private
+     */
     this.lastCoordinate_ = null;
-    handleMoveEvent.call(this, event);
 
-    const features = this.features_ || new Collection([this.lastFeature_]);
-
-    this.dispatchEvent(
-      new Translate.Event(
-        TranslateEventType.TRANSLATEEND, features,
-        event.coordinate));
-    return true;
-  }
-  return false;
-}
+    /**
+     * The start position before translation started.
+     * @type {import("../coordinate.js").Coordinate}
+     * @private
+     */
+    this.startCoordinate_ = null;
 
 
-/**
- * @param {ol.MapBrowserPointerEvent} event Event.
- * @this {ol.interaction.Translate}
- */
-function handleDragEvent(event) {
-  if (this.lastCoordinate_) {
-    const newCoordinate = event.coordinate;
-    const deltaX = newCoordinate[0] - this.lastCoordinate_[0];
-    const deltaY = newCoordinate[1] - this.lastCoordinate_[1];
+    /**
+     * @type {Collection<import("../Feature.js").default>}
+     * @private
+     */
+    this.features_ = options.features !== undefined ? options.features : null;
 
-    const features = this.features_ || new Collection([this.lastFeature_]);
-
-    features.forEach(function(feature) {
-      const geom = feature.getGeometry();
-      geom.translate(deltaX, deltaY);
-      feature.setGeometry(geom);
-    });
-
-    this.lastCoordinate_ = newCoordinate;
-    this.dispatchEvent(
-      new Translate.Event(
-        TranslateEventType.TRANSLATING, features,
-        newCoordinate));
-  }
-}
-
-
-/**
- * @param {ol.MapBrowserEvent} event Event.
- * @this {ol.interaction.Translate}
- */
-function handleMoveEvent(event) {
-  const elem = event.map.getViewport();
-
-  // Change the cursor to grab/grabbing if hovering any of the features managed
-  // by the interaction
-  if (this.featuresAtPixel_(event.pixel, event.map)) {
-    elem.classList.remove(this.lastCoordinate_ ? 'ol-grab' : 'ol-grabbing');
-    elem.classList.add(this.lastCoordinate_ ? 'ol-grabbing' : 'ol-grab');
-  } else {
-    elem.classList.remove('ol-grab', 'ol-grabbing');
-  }
-}
-
-
-/**
- * Tests to see if the given coordinates intersects any of our selected
- * features.
- * @param {ol.Pixel} pixel Pixel coordinate to test for intersection.
- * @param {ol.PluggableMap} map Map to test the intersection on.
- * @return {ol.Feature} Returns the feature found at the specified pixel
- * coordinates.
- * @private
- */
-Translate.prototype.featuresAtPixel_ = function(pixel, map) {
-  return map.forEachFeatureAtPixel(pixel,
-    function(feature) {
-      if (!this.features_ || includes(this.features_.getArray(), feature)) {
-        return feature;
+    /** @type {function(import("../layer/Layer.js").default): boolean} */
+    let layerFilter;
+    if (options.layers) {
+      if (typeof options.layers === 'function') {
+        layerFilter = options.layers;
+      } else {
+        const layers = options.layers;
+        layerFilter = function(layer) {
+          return includes(layers, layer);
+        };
       }
-    }.bind(this), {
-      layerFilter: this.layerFilter_,
-      hitTolerance: this.hitTolerance_
-    });
-};
+    } else {
+      layerFilter = TRUE;
+    }
 
+    /**
+     * @private
+     * @type {function(import("../layer/Layer.js").default): boolean}
+     */
+    this.layerFilter_ = layerFilter;
 
-/**
- * Returns the Hit-detection tolerance.
- * @returns {number} Hit tolerance in pixels.
- * @api
- */
-Translate.prototype.getHitTolerance = function() {
-  return this.hitTolerance_;
-};
+    /**
+     * @private
+     * @type {FilterFunction}
+     */
+    this.filter_ = options.filter ? options.filter : TRUE;
 
+    /**
+     * @private
+     * @type {number}
+     */
+    this.hitTolerance_ = options.hitTolerance ? options.hitTolerance : 0;
 
-/**
- * Hit-detection tolerance. Pixels inside the radius around the given position
- * will be checked for features. This only works for the canvas renderer and
- * not for WebGL.
- * @param {number} hitTolerance Hit tolerance in pixels.
- * @api
- */
-Translate.prototype.setHitTolerance = function(hitTolerance) {
-  this.hitTolerance_ = hitTolerance;
-};
+    /**
+     * @type {import("../Feature.js").default}
+     * @private
+     */
+    this.lastFeature_ = null;
 
+    this.addEventListener(getChangeEventType(InteractionProperty.ACTIVE), this.handleActiveChanged_);
 
-/**
- * @inheritDoc
- */
-Translate.prototype.setMap = function(map) {
-  const oldMap = this.getMap();
-  PointerInteraction.prototype.setMap.call(this, map);
-  this.updateState_(oldMap);
-};
+  }
 
+  /**
+   * @inheritDoc
+   */
+  handleDownEvent(event) {
+    this.lastFeature_ = this.featuresAtPixel_(event.pixel, event.map);
+    if (!this.lastCoordinate_ && this.lastFeature_) {
+      this.startCoordinate_ = event.coordinate;
+      this.lastCoordinate_ = event.coordinate;
+      this.handleMoveEvent(event);
 
-/**
- * @private
- */
-Translate.prototype.handleActiveChanged_ = function() {
-  this.updateState_(null);
-};
+      const features = this.features_ || new Collection([this.lastFeature_]);
 
+      this.dispatchEvent(
+        new TranslateEvent(
+          TranslateEventType.TRANSLATESTART, features,
+          event.coordinate, this.startCoordinate_, event));
+      return true;
+    }
+    return false;
+  }
 
-/**
- * @param {ol.PluggableMap} oldMap Old map.
- * @private
- */
-Translate.prototype.updateState_ = function(oldMap) {
-  let map = this.getMap();
-  const active = this.getActive();
-  if (!map || !active) {
-    map = map || oldMap;
-    if (map) {
-      const elem = map.getViewport();
+  /**
+   * @inheritDoc
+   */
+  handleUpEvent(event) {
+    if (this.lastCoordinate_) {
+      this.lastCoordinate_ = null;
+      this.handleMoveEvent(event);
+
+      const features = this.features_ || new Collection([this.lastFeature_]);
+
+      this.dispatchEvent(
+        new TranslateEvent(
+          TranslateEventType.TRANSLATEEND, features,
+          event.coordinate, this.startCoordinate_, event));
+      // cleanup
+      this.startCoordinate_ = null;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * @inheritDoc
+   */
+  handleDragEvent(event) {
+    if (this.lastCoordinate_) {
+      const newCoordinate = event.coordinate;
+      const deltaX = newCoordinate[0] - this.lastCoordinate_[0];
+      const deltaY = newCoordinate[1] - this.lastCoordinate_[1];
+
+      const features = this.features_ || new Collection([this.lastFeature_]);
+
+      features.forEach(function(feature) {
+        const geom = feature.getGeometry();
+        geom.translate(deltaX, deltaY);
+        feature.setGeometry(geom);
+      });
+
+      this.lastCoordinate_ = newCoordinate;
+      this.dispatchEvent(
+        new TranslateEvent(
+          TranslateEventType.TRANSLATING, features,
+          newCoordinate, this.startCoordinate_, event));
+    }
+  }
+
+  /**
+   * @inheritDoc
+   */
+  handleMoveEvent(event) {
+    const elem = event.map.getViewport();
+
+    // Change the cursor to grab/grabbing if hovering any of the features managed
+    // by the interaction
+    if (this.featuresAtPixel_(event.pixel, event.map)) {
+      elem.classList.remove(this.lastCoordinate_ ? 'ol-grab' : 'ol-grabbing');
+      elem.classList.add(this.lastCoordinate_ ? 'ol-grabbing' : 'ol-grab');
+    } else {
       elem.classList.remove('ol-grab', 'ol-grabbing');
     }
   }
-};
-
-
-/**
- * @classdesc
- * Events emitted by {@link ol.interaction.Translate} instances are instances of
- * this type.
- *
- * @constructor
- * @extends {ol.events.Event}
- * @implements {oli.interaction.TranslateEvent}
- * @param {ol.interaction.TranslateEventType} type Type.
- * @param {ol.Collection.<ol.Feature>} features The features translated.
- * @param {ol.Coordinate} coordinate The event coordinate.
- */
-Translate.Event = function(type, features, coordinate) {
-
-  Event.call(this, type);
 
   /**
-   * The features being translated.
-   * @type {ol.Collection.<ol.Feature>}
-   * @api
+   * Tests to see if the given coordinates intersects any of our selected
+   * features.
+   * @param {import("../pixel.js").Pixel} pixel Pixel coordinate to test for intersection.
+   * @param {import("../PluggableMap.js").default} map Map to test the intersection on.
+   * @return {import("../Feature.js").default} Returns the feature found at the specified pixel
+   * coordinates.
+   * @private
    */
-  this.features = features;
+  featuresAtPixel_(pixel, map) {
+    return map.forEachFeatureAtPixel(pixel,
+      function(feature, layer) {
+        if (this.filter_(feature, layer)) {
+          if (!this.features_ || includes(this.features_.getArray(), feature)) {
+            return feature;
+          }
+        }
+      }.bind(this), {
+        layerFilter: this.layerFilter_,
+        hitTolerance: this.hitTolerance_
+      });
+  }
 
   /**
-   * The coordinate of the drag event.
-   * @const
-   * @type {ol.Coordinate}
+   * Returns the Hit-detection tolerance.
+   * @returns {number} Hit tolerance in pixels.
    * @api
    */
-  this.coordinate = coordinate;
-};
+  getHitTolerance() {
+    return this.hitTolerance_;
+  }
 
-inherits(Translate.Event, Event);
+  /**
+   * Hit-detection tolerance. Pixels inside the radius around the given position
+   * will be checked for features.
+   * @param {number} hitTolerance Hit tolerance in pixels.
+   * @api
+   */
+  setHitTolerance(hitTolerance) {
+    this.hitTolerance_ = hitTolerance;
+  }
+
+  /**
+   * @inheritDoc
+   */
+  setMap(map) {
+    const oldMap = this.getMap();
+    super.setMap(map);
+    this.updateState_(oldMap);
+  }
+
+  /**
+   * @private
+   */
+  handleActiveChanged_() {
+    this.updateState_(null);
+  }
+
+  /**
+   * @param {import("../PluggableMap.js").default} oldMap Old map.
+   * @private
+   */
+  updateState_(oldMap) {
+    let map = this.getMap();
+    const active = this.getActive();
+    if (!map || !active) {
+      map = map || oldMap;
+      if (map) {
+        const elem = map.getViewport();
+        elem.classList.remove('ol-grab', 'ol-grabbing');
+      }
+    }
+  }
+}
 
 export default Translate;

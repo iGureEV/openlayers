@@ -1,17 +1,24 @@
 /**
  * @module ol/tilecoord
  */
-const _ol_tilecoord_ = {};
+
+
+/**
+ * An array of three numbers representing the location of a tile in a tile
+ * grid. The order is `z` (zoom level), `x` (column), and `y` (row).
+ * @typedef {Array<number>} TileCoord
+ * @api
+ */
 
 
 /**
  * @param {number} z Z.
  * @param {number} x X.
  * @param {number} y Y.
- * @param {ol.TileCoord=} opt_tileCoord Tile coordinate.
- * @return {ol.TileCoord} Tile coordinate.
+ * @param {TileCoord=} opt_tileCoord Tile coordinate.
+ * @return {TileCoord} Tile coordinate.
  */
-_ol_tilecoord_.createOrUpdate = function(z, x, y, opt_tileCoord) {
+export function createOrUpdate(z, x, y, opt_tileCoord) {
   if (opt_tileCoord !== undefined) {
     opt_tileCoord[0] = z;
     opt_tileCoord[1] = x;
@@ -20,7 +27,7 @@ _ol_tilecoord_.createOrUpdate = function(z, x, y, opt_tileCoord) {
   } else {
     return [z, x, y];
   }
-};
+}
 
 
 /**
@@ -29,71 +36,46 @@ _ol_tilecoord_.createOrUpdate = function(z, x, y, opt_tileCoord) {
  * @param {number} y Y.
  * @return {string} Key.
  */
-_ol_tilecoord_.getKeyZXY = function(z, x, y) {
+export function getKeyZXY(z, x, y) {
   return z + '/' + x + '/' + y;
-};
+}
 
 
 /**
  * Get the key for a tile coord.
- * @param {ol.TileCoord} tileCoord The tile coord.
+ * @param {TileCoord} tileCoord The tile coord.
  * @return {string} Key.
  */
-_ol_tilecoord_.getKey = function(tileCoord) {
-  return _ol_tilecoord_.getKeyZXY(tileCoord[0], tileCoord[1], tileCoord[2]);
-};
+export function getKey(tileCoord) {
+  return getKeyZXY(tileCoord[0], tileCoord[1], tileCoord[2]);
+}
 
 
 /**
  * Get a tile coord given a key.
  * @param {string} key The tile coord key.
- * @return {ol.TileCoord} The tile coord.
+ * @return {TileCoord} The tile coord.
  */
-_ol_tilecoord_.fromKey = function(key) {
+export function fromKey(key) {
   return key.split('/').map(Number);
-};
+}
 
 
 /**
- * @param {ol.TileCoord} tileCoord Tile coord.
+ * @param {TileCoord} tileCoord Tile coord.
  * @return {number} Hash.
  */
-_ol_tilecoord_.hash = function(tileCoord) {
+export function hash(tileCoord) {
   return (tileCoord[1] << tileCoord[0]) + tileCoord[2];
-};
+}
 
 
 /**
- * @param {ol.TileCoord} tileCoord Tile coord.
- * @return {string} Quad key.
- */
-_ol_tilecoord_.quadKey = function(tileCoord) {
-  const z = tileCoord[0];
-  const digits = new Array(z);
-  let mask = 1 << (z - 1);
-  let i, charCode;
-  for (i = 0; i < z; ++i) {
-    // 48 is charCode for 0 - '0'.charCodeAt(0)
-    charCode = 48;
-    if (tileCoord[1] & mask) {
-      charCode += 1;
-    }
-    if (tileCoord[2] & mask) {
-      charCode += 2;
-    }
-    digits[i] = String.fromCharCode(charCode);
-    mask >>= 1;
-  }
-  return digits.join('');
-};
-
-
-/**
- * @param {ol.TileCoord} tileCoord Tile coordinate.
- * @param {!ol.tilegrid.TileGrid} tileGrid Tile grid.
+ * @param {TileCoord} tileCoord Tile coordinate.
+ * @param {!import("./tilegrid/TileGrid.js").default} tileGrid Tile grid.
  * @return {boolean} Tile coordinate is within extent and zoom level range.
  */
-_ol_tilecoord_.withinExtentAndZ = function(tileCoord, tileGrid) {
+export function withinExtentAndZ(tileCoord, tileGrid) {
   const z = tileCoord[0];
   const x = tileCoord[1];
   const y = tileCoord[2];
@@ -113,5 +95,4 @@ _ol_tilecoord_.withinExtentAndZ = function(tileCoord, tileGrid) {
   } else {
     return tileRange.containsXY(x, y);
   }
-};
-export default _ol_tilecoord_;
+}

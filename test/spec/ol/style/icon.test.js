@@ -1,7 +1,7 @@
-import {getUid} from '../../../../src/ol/index.js';
-import {iconImageCache} from '../../../../src/ol/style.js';
+import {getUid} from '../../../../src/ol/util.js';
+import {shared as iconImageCache} from '../../../../src/ol/style/IconImageCache.js';
 import Icon from '../../../../src/ol/style/Icon.js';
-import IconImage from '../../../../src/ol/style/IconImage.js';
+import IconImage, {get as getIconImage} from '../../../../src/ol/style/IconImage.js';
 
 
 describe('ol.style.Icon', function() {
@@ -17,8 +17,7 @@ describe('ol.style.Icon', function() {
         img: canvas,
         imgSize: size
       });
-      expect(IconImage.get(
-        canvas, getUid(canvas), size, '').getImage()).to.eql(canvas);
+      expect(getIconImage(canvas, getUid(canvas), size, '').getImage()).to.eql(canvas);
     });
 
     it('imgSize overrides img.width and img.height', function(done) {
@@ -62,7 +61,6 @@ describe('ol.style.Icon', function() {
         offsetOrigin: 'bottom-left',
         opacity: 0.5,
         scale: 2,
-        snapToPixel: false,
         rotation: 4,
         size: [10, 12]
       });
@@ -83,7 +81,6 @@ describe('ol.style.Icon', function() {
       expect(original.getOpacity()).to.eql(clone.getOpacity());
       expect(original.getRotation()).to.eql(clone.getRotation());
       expect(original.getRotateWithView()).to.eql(clone.getRotateWithView());
-      expect(original.getSnapToPixel()).to.eql(clone.getSnapToPixel());
 
       const original2 = new Icon({
         src: src
@@ -100,22 +97,26 @@ describe('ol.style.Icon', function() {
         color: [1, 2, 3, 0.4],
         src: src,
         offset: [1, 2],
-        size: [10, 12]
+        size: [10, 12],
+        displacement: [5, 6]
       });
       const clone = original.clone();
       expect(original.getAnchor()).not.to.be(clone.getAnchor());
       expect(original.offset_).not.to.be(clone.offset_);
       expect(original.getColor()).not.to.be(clone.getColor());
       expect(original.getSize()).not.to.be(clone.getSize());
+      expect(original.getDisplacement()).not.to.be(clone.getDisplacement());
 
       clone.anchor_[0] = 0;
       clone.offset_[0] = 0;
       clone.color_[0] = 0;
       clone.size_[0] = 5;
+      clone.displacement_[0] = 10;
       expect(original.anchor_).not.to.eql(clone.anchor_);
       expect(original.offset_).not.to.eql(clone.offset_);
       expect(original.color_).not.to.eql(clone.color_);
       expect(original.size_).not.to.eql(clone.size_);
+      expect(original.displacement_).not.to.eql(clone.displacement_);
     });
   });
 
@@ -173,6 +174,20 @@ describe('ol.style.Icon', function() {
     });
   });
 
+  describe('#setAnchor', function() {
+    it('resets the cached anchor', function() {
+      const iconStyle = new Icon({
+        src: 'test.png',
+        size: size,
+        anchor: [0.25, 0.25]
+      });
+      expect(iconStyle.getAnchor()).to.eql([9, 12]);
+
+      iconStyle.setAnchor([0.5, 0.5]);
+      expect(iconStyle.getAnchor()).to.eql([18, 24]);
+    });
+  });
+
   describe('#getOrigin', function() {
     const offset = [16, 20];
     const imageSize = [144, 192];
@@ -217,6 +232,18 @@ describe('ol.style.Icon', function() {
       });
       iconStyle.iconImage_.size_ = imageSize;
       expect(iconStyle.getOrigin()).to.eql([92, 20]);
+    });
+
+    it('uses a top right offset origin + displacement', function() {
+      const iconStyle = new Icon({
+        src: 'test.png',
+        size: size,
+        offset: offset,
+        offsetOrigin: 'top-right',
+        displacement: [20, 10]
+      });
+      iconStyle.iconImage_.size_ = imageSize;
+      expect(iconStyle.getOrigin()).to.eql([92 + 20, 20 + 10]);
     });
   });
 

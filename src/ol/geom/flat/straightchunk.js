@@ -1,19 +1,18 @@
 /**
  * @module ol/geom/flat/straightchunk
  */
-const _ol_geom_flat_straightchunk_ = {};
 
 
 /**
  * @param {number} maxAngle Maximum acceptable angle delta between segments.
- * @param {Array.<number>} flatCoordinates Flat coordinates.
+ * @param {Array<number>} flatCoordinates Flat coordinates.
  * @param {number} offset Offset.
  * @param {number} end End.
  * @param {number} stride Stride.
- * @return {Array.<number>} Start and end of the first suitable chunk of the
+ * @return {Array<number>} Start and end of the first suitable chunk of the
  * given `flatCoordinates`.
  */
-_ol_geom_flat_straightchunk_.lineString = function(maxAngle, flatCoordinates, offset, end, stride) {
+export function matchingChunk(maxAngle, flatCoordinates, offset, end, stride) {
   let chunkStart = offset;
   let chunkEnd = offset;
   let chunkM = 0;
@@ -49,5 +48,4 @@ _ol_geom_flat_straightchunk_.lineString = function(maxAngle, flatCoordinates, of
   }
   m += m23;
   return m > chunkM ? [start, i] : [chunkStart, chunkEnd];
-};
-export default _ol_geom_flat_straightchunk_;
+}

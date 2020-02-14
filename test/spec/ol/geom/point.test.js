@@ -1,12 +1,13 @@
 import Point from '../../../../src/ol/geom/Point.js';
+import {get as getProjection, getTransformFromProjections} from '../../../../src/ol/proj.js';
 
 
 describe('ol.geom.Point', function() {
 
-  it('can be constructed with a null geometry', function() {
+  it('cannot be constructed with a null geometry', function() {
     expect(function() {
       return new Point(null);
-    }).not.to.throwException();
+    }).to.throwException();
   });
 
   describe('construct with 2D coordinates', function() {
@@ -154,6 +155,45 @@ describe('ol.geom.Point', function() {
 
   });
 
+  describe('#simplifyTransformed()', function() {
+
+    it('returns the same result if called twice with the same arguments', function() {
+      const geom = new Point([1, 2]);
+      const source = getProjection('EPSG:4326');
+      const dest = getProjection('EPSG:3857');
+      const transform = getTransformFromProjections(source, dest);
+      const squaredTolerance = 0.5;
+      const first = geom.simplifyTransformed(squaredTolerance, transform);
+      const second = geom.simplifyTransformed(squaredTolerance, transform);
+      expect(second).to.be(first);
+    });
+
+    it('returns a different result if called with a different tolerance', function() {
+      const geom = new Point([1, 2]);
+      const source = getProjection('EPSG:4326');
+      const dest = getProjection('EPSG:3857');
+      const transform = getTransformFromProjections(source, dest);
+      const squaredTolerance = 0.5;
+      const first = geom.simplifyTransformed(squaredTolerance, transform);
+      const second = geom.simplifyTransformed(squaredTolerance * 2, transform);
+      expect(second).not.to.be(first);
+    });
+
+    it('returns a different result if called after geometry modification', function() {
+      const geom = new Point([1, 2]);
+      const source = getProjection('EPSG:4326');
+      const dest = getProjection('EPSG:3857');
+      const transform = getTransformFromProjections(source, dest);
+      const squaredTolerance = 0.5;
+      const first = geom.simplifyTransformed(squaredTolerance, transform);
+
+      geom.setCoordinates([3, 4]);
+      const second = geom.simplifyTransformed(squaredTolerance * 2, transform);
+      expect(second).not.to.be(first);
+    });
+
+  });
+
   describe('#applyTransform()', function() {
 
     let point, transform;
@@ -211,6 +251,24 @@ describe('ol.geom.Point', function() {
 
       expect(coords[0]).to.roughlyEqual(-12356463.47, 1e-2);
       expect(coords[1]).to.roughlyEqual(5621521.48, 1e-2);
+    });
+
+  });
+
+  describe('#containsXY()', function() {
+
+    it('does contain XY', function() {
+      const point = new Point([1, 2]);
+
+      expect(point.containsXY(1, 2)).to.be(true);
+    });
+
+    it('does not contain XY', function() {
+      const point = new Point([1, 2]);
+
+      expect(point.containsXY(1, 3)).to.be(false);
+      expect(point.containsXY(2, 2)).to.be(false);
+      expect(point.containsXY(2, 3)).to.be(false);
     });
 
   });

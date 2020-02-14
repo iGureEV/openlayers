@@ -1,4 +1,3 @@
-import AtlasManager from '../../../../src/ol/style/AtlasManager.js';
 import RegularShape from '../../../../src/ol/style/RegularShape.js';
 import Fill from '../../../../src/ol/style/Fill.js';
 import Stroke from '../../../../src/ol/style/Stroke.js';
@@ -34,20 +33,38 @@ describe('ol.style.RegularShape', function() {
       expect(style.getRadius2()).to.eql(10);
     });
 
-    it('creates a canvas if no atlas is used (no fill-style)', function() {
+    it('creates a canvas (no fill-style)', function() {
       const style = new RegularShape({radius: 10});
       expect(style.getImage()).to.be.an(HTMLCanvasElement);
       expect(style.getSize()).to.eql([21, 21]);
       expect(style.getImageSize()).to.eql([21, 21]);
       expect(style.getOrigin()).to.eql([0, 0]);
       expect(style.getAnchor()).to.eql([10.5, 10.5]);
-      // hit-detection image is created, because no fill style is set
+      // no hit-detection image is created, because no fill style is set
+      expect(style.getImage()).to.be(style.getHitDetectionImage());
+      expect(style.getHitDetectionImage()).to.be.an(HTMLCanvasElement);
+      expect(style.getHitDetectionImageSize()).to.eql([21, 21]);
+    });
+
+    it('creates a canvas (transparent fill-style)', function() {
+      const style = new RegularShape({
+        radius: 10,
+        fill: new Fill({
+          color: 'transparent'
+        })
+      });
+      expect(style.getImage()).to.be.an(HTMLCanvasElement);
+      expect(style.getSize()).to.eql([21, 21]);
+      expect(style.getImageSize()).to.eql([21, 21]);
+      expect(style.getOrigin()).to.eql([0, 0]);
+      expect(style.getAnchor()).to.eql([10.5, 10.5]);
+      // hit-detection image is created, because transparent fill style is set
       expect(style.getImage()).to.not.be(style.getHitDetectionImage());
       expect(style.getHitDetectionImage()).to.be.an(HTMLCanvasElement);
       expect(style.getHitDetectionImageSize()).to.eql([21, 21]);
     });
 
-    it('creates a canvas if no atlas is used (fill-style)', function() {
+    it('creates a canvas (non-transparent fill-style)', function() {
       const style = new RegularShape({
         radius: 10,
         fill: new Fill({
@@ -59,45 +76,29 @@ describe('ol.style.RegularShape', function() {
       expect(style.getImageSize()).to.eql([21, 21]);
       expect(style.getOrigin()).to.eql([0, 0]);
       expect(style.getAnchor()).to.eql([10.5, 10.5]);
-      // no hit-detection image is created, because fill style is set
+      // no hit-detection image is created, because non-transparent fill style is set
       expect(style.getImage()).to.be(style.getHitDetectionImage());
       expect(style.getHitDetectionImage()).to.be.an(HTMLCanvasElement);
       expect(style.getHitDetectionImageSize()).to.eql([21, 21]);
     });
 
-    it('adds itself to an atlas manager (no fill-style)', function() {
-      const atlasManager = new AtlasManager({initialSize: 512});
-      const style = new RegularShape(
-        {radius: 10, atlasManager: atlasManager});
-      expect(style.getImage()).to.be.an(HTMLCanvasElement);
-      expect(style.getSize()).to.eql([21, 21]);
-      expect(style.getImageSize()).to.eql([512, 512]);
-      expect(style.getOrigin()).to.eql([1, 1]);
-      expect(style.getAnchor()).to.eql([10.5, 10.5]);
-      // hit-detection image is created, because no fill style is set
-      expect(style.getImage()).to.not.be(style.getHitDetectionImage());
-      expect(style.getHitDetectionImage()).to.be.an(HTMLCanvasElement);
-      expect(style.getHitDetectionImageSize()).to.eql([512, 512]);
+    it('sets default displacement [0, 0]', function() {
+      const style = new RegularShape({
+        radius: 5
+      });
+      expect(style.getDisplacement()).to.an('array');
+      expect(style.getDisplacement()[0]).to.eql(0);
+      expect(style.getDisplacement()[1]).to.eql(0);
     });
 
-    it('adds itself to an atlas manager (fill-style)', function() {
-      const atlasManager = new AtlasManager({initialSize: 512});
+    it('can use offset', function() {
       const style = new RegularShape({
-        radius: 10,
-        atlasManager: atlasManager,
-        fill: new Fill({
-          color: '#FFFF00'
-        })
+        radius: 5,
+        displacement: [10, 20]
       });
-      expect(style.getImage()).to.be.an(HTMLCanvasElement);
-      expect(style.getSize()).to.eql([21, 21]);
-      expect(style.getImageSize()).to.eql([512, 512]);
-      expect(style.getOrigin()).to.eql([1, 1]);
-      expect(style.getAnchor()).to.eql([10.5, 10.5]);
-      // no hit-detection image is created, because fill style is set
-      expect(style.getImage()).to.be(style.getHitDetectionImage());
-      expect(style.getHitDetectionImage()).to.be.an(HTMLCanvasElement);
-      expect(style.getHitDetectionImageSize()).to.eql([512, 512]);
+      expect(style.getDisplacement()).to.an('array');
+      expect(style.getDisplacement()[0]).to.eql(10);
+      expect(style.getDisplacement()[1]).to.eql(20);
     });
   });
 
@@ -121,12 +122,12 @@ describe('ol.style.RegularShape', function() {
         radius: 4,
         radius2: 6,
         angle: 1,
-        snapToPixel: false,
         stroke: new Stroke({
           color: '#319FD3'
         }),
         rotation: 2,
-        rotateWithView: true
+        rotateWithView: true,
+        displacement: [10, 20]
       });
       original.setOpacity(0.5);
       original.setScale(1.5);
@@ -140,8 +141,9 @@ describe('ol.style.RegularShape', function() {
       expect(original.getRotation()).to.eql(clone.getRotation());
       expect(original.getRotateWithView()).to.eql(clone.getRotateWithView());
       expect(original.getScale()).to.eql(clone.getScale());
-      expect(original.getSnapToPixel()).to.eql(clone.getSnapToPixel());
       expect(original.getStroke().getColor()).to.eql(clone.getStroke().getColor());
+      expect(original.getDisplacement()[0]).to.eql(clone.getDisplacement()[0]);
+      expect(original.getDisplacement()[1]).to.eql(clone.getDisplacement()[1]);
     });
 
     it('the clone does not reference the same objects as the original', function() {
@@ -151,11 +153,13 @@ describe('ol.style.RegularShape', function() {
         }),
         stroke: new Stroke({
           color: '#319FD3'
-        })
+        }),
+        displacement: [0, 5]
       });
       const clone = original.clone();
       expect(original.getFill()).to.not.be(clone.getFill());
       expect(original.getStroke()).to.not.be(clone.getStroke());
+      expect(original.getDisplacement()).to.not.be(clone.getDisplacement());
 
       clone.getFill().setColor('#012345');
       clone.getStroke().setColor('#012345');
@@ -164,184 +168,4 @@ describe('ol.style.RegularShape', function() {
     });
   });
 
-
-  describe('#getChecksum', function() {
-
-    it('calculates not the same hash code (radius)', function() {
-      const style1 = new RegularShape({
-        radius: 4,
-        radius2: 5
-      });
-      const style2 = new RegularShape({
-        radius: 3,
-        radius2: 5
-      });
-      expect(style1.getChecksum()).to.not.eql(style2.getChecksum());
-    });
-
-    it('calculates not the same hash code (radius2)', function() {
-      const style1 = new RegularShape({
-        radius: 4,
-        radius2: 5
-      });
-      const style2 = new RegularShape({
-        radius: 4,
-        radius2: 6
-      });
-      expect(style1.getChecksum()).to.not.eql(style2.getChecksum());
-    });
-
-    it('calculates the same hash code (radius)', function() {
-      const style1 = new RegularShape({
-        radius: 5
-      });
-      const style2 = new RegularShape({
-        radius: 5
-      });
-      expect(style1.getChecksum()).to.eql(style2.getChecksum());
-    });
-
-    it('calculates not the same hash code (color)', function() {
-      const style1 = new RegularShape({
-        radius: 5,
-        fill: new Fill({
-          color: '#319FD3'
-        })
-      });
-      const style2 = new RegularShape({
-        radius: 5,
-        stroke: new Stroke({
-          color: '#319FD3'
-        })
-      });
-      expect(style1.getChecksum()).to.not.eql(style2.getChecksum());
-    });
-
-    it('calculates the same hash code (everything set)', function() {
-      const style1 = new RegularShape({
-        radius: 5,
-        radius2: 3,
-        angle: 1.41,
-        points: 5,
-        fill: new Fill({
-          color: '#319FD3'
-        }),
-        stroke: new Stroke({
-          color: '#319FD3',
-          lineCap: 'round',
-          lineDash: [5, 15, 25],
-          lineJoin: 'miter',
-          miterLimit: 4,
-          width: 2
-        })
-      });
-      const style2 = new RegularShape({
-        radius: 5,
-        radius2: 3,
-        angle: 1.41,
-        points: 5,
-        fill: new Fill({
-          color: '#319FD3'
-        }),
-        stroke: new Stroke({
-          color: '#319FD3',
-          lineCap: 'round',
-          lineDash: [5, 15, 25],
-          lineJoin: 'miter',
-          miterLimit: 4,
-          width: 2
-        })
-      });
-      expect(style1.getChecksum()).to.eql(style2.getChecksum());
-    });
-
-    it('calculates not the same hash code (stroke width differs)', function() {
-      const style1 = new RegularShape({
-        radius: 5,
-        radius2: 3,
-        angle: 1.41,
-        points: 5,
-        fill: new Fill({
-          color: '#319FD3'
-        }),
-        stroke: new Stroke({
-          color: '#319FD3',
-          lineCap: 'round',
-          lineDash: [5, 15, 25],
-          lineJoin: 'miter',
-          miterLimit: 4,
-          width: 3
-        })
-      });
-      const style2 = new RegularShape({
-        radius: 5,
-        radius2: 3,
-        angle: 1.41,
-        points: 5,
-        fill: new Fill({
-          color: '#319FD3'
-        }),
-        stroke: new Stroke({
-          color: '#319FD3',
-          lineCap: 'round',
-          lineDash: [5, 15, 25],
-          lineJoin: 'miter',
-          miterLimit: 4,
-          width: 2
-        })
-      });
-      expect(style1.getChecksum()).to.not.eql(style2.getChecksum());
-    });
-
-    it('invalidates a cached checksum if values change (fill)', function() {
-      const style1 = new RegularShape({
-        radius: 5,
-        fill: new Fill({
-          color: '#319FD3'
-        }),
-        stroke: new Stroke({
-          color: '#319FD3'
-        })
-      });
-      const style2 = new RegularShape({
-        radius: 5,
-        fill: new Fill({
-          color: '#319FD3'
-        }),
-        stroke: new Stroke({
-          color: '#319FD3'
-        })
-      });
-      expect(style1.getChecksum()).to.eql(style2.getChecksum());
-
-      style1.getFill().setColor('red');
-      expect(style1.getChecksum()).to.not.eql(style2.getChecksum());
-    });
-
-    it('invalidates a cached checksum if values change (stroke)', function() {
-      const style1 = new RegularShape({
-        radius: 5,
-        fill: new Fill({
-          color: '#319FD3'
-        }),
-        stroke: new Stroke({
-          color: '#319FD3'
-        })
-      });
-      const style2 = new RegularShape({
-        radius: 5,
-        fill: new Fill({
-          color: '#319FD3'
-        }),
-        stroke: new Stroke({
-          color: '#319FD3'
-        })
-      });
-      expect(style1.getChecksum()).to.eql(style2.getChecksum());
-
-      style1.getStroke().setWidth(4);
-      expect(style1.getChecksum()).to.not.eql(style2.getChecksum());
-    });
-
-  });
 });

@@ -1,20 +1,11 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import * as _ol_extent_ from '../src/ol/extent.js';
+import {createEmpty, getWidth, getHeight, extend} from '../src/ol/extent.js';
 import KML from '../src/ol/format/KML.js';
-import {defaults as defaultInteractions} from '../src/ol/interaction.js';
-import Select from '../src/ol/interaction/Select.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import VectorLayer from '../src/ol/layer/Vector.js';
-import Cluster from '../src/ol/source/Cluster.js';
-import Stamen from '../src/ol/source/Stamen.js';
-import VectorSource from '../src/ol/source/Vector.js';
-import CircleStyle from '../src/ol/style/Circle.js';
-import Fill from '../src/ol/style/Fill.js';
-import RegularShape from '../src/ol/style/RegularShape.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
-import Text from '../src/ol/style/Text.js';
+import {defaults as defaultInteractions, Select} from '../src/ol/interaction.js';
+import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
+import {Cluster, Stamen, Vector as VectorSource} from '../src/ol/source.js';
+import {Circle as CircleStyle, Fill, RegularShape, Stroke, Style, Text} from '../src/ol/style.js';
 
 
 const earthquakeFill = new Fill({
@@ -65,13 +56,13 @@ const calculateClusterInfo = function(resolution) {
   for (let i = features.length - 1; i >= 0; --i) {
     feature = features[i];
     const originalFeatures = feature.get('features');
-    const extent = _ol_extent_.createEmpty();
+    const extent = createEmpty();
     let j, jj;
     for (j = 0, jj = originalFeatures.length; j < jj; ++j) {
-      _ol_extent_.extend(extent, originalFeatures[j].getGeometry().getExtent());
+      extend(extent, originalFeatures[j].getGeometry().getExtent());
     }
     maxFeatureCount = Math.max(maxFeatureCount, jj);
-    radius = 0.25 * (_ol_extent_.getWidth(extent) + _ol_extent_.getHeight(extent)) /
+    radius = 0.25 * (getWidth(extent) + getHeight(extent)) /
         resolution;
     feature.set('radius', radius);
   }
@@ -145,7 +136,7 @@ const map = new Map({
   layers: [raster, vector],
   interactions: defaultInteractions().extend([new Select({
     condition: function(evt) {
-      return  evt.type == 'pointermove' ||
+      return evt.type == 'pointermove' ||
           evt.type == 'singleclick';
     },
     style: selectStyleFunction

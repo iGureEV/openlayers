@@ -3,16 +3,17 @@ import Feature from '../../../../src/ol/Feature.js';
 import Map from '../../../../src/ol/Map.js';
 import MapBrowserPointerEvent from '../../../../src/ol/MapBrowserPointerEvent.js';
 import View from '../../../../src/ol/View.js';
-import {getListeners} from '../../../../src/ol/events.js';
 import {doubleClick} from '../../../../src/ol/events/condition.js';
 import Circle from '../../../../src/ol/geom/Circle.js';
 import LineString from '../../../../src/ol/geom/LineString.js';
 import Point from '../../../../src/ol/geom/Point.js';
 import Polygon from '../../../../src/ol/geom/Polygon.js';
-import Modify from '../../../../src/ol/interaction/Modify.js';
+import Modify, {ModifyEvent} from '../../../../src/ol/interaction/Modify.js';
+import Snap from '../../../../src/ol/interaction/Snap.js';
 import VectorLayer from '../../../../src/ol/layer/Vector.js';
-import PointerEvent from '../../../../src/ol/pointer/PointerEvent.js';
 import VectorSource from '../../../../src/ol/source/Vector.js';
+import Event from '../../../../src/ol/events/Event.js';
+import {getValues} from '../../../../src/ol/obj.js';
 
 
 describe('ol.interaction.Modify', function() {
@@ -81,18 +82,18 @@ describe('ol.interaction.Modify', function() {
     const viewport = map.getViewport();
     // calculated in case body has top < 0 (test runner with small window)
     const position = viewport.getBoundingClientRect();
-    const pointerEvent = new PointerEvent(type, {
-      type: type,
-      clientX: position.left + x + width / 2,
-      clientY: position.top + y + height / 2,
-      shiftKey: modifiers.shift || false,
-      altKey: modifiers.alt || false
-    }, {
-      button: button,
-      isPrimary: true
-    });
+    const pointerEvent = new Event();
+    pointerEvent.type = type;
+    pointerEvent.target = viewport.firstChild;
+    pointerEvent.clientX = position.left + x + width / 2;
+    pointerEvent.clientY = position.top + y + height / 2;
+    pointerEvent.shiftKey = modifiers.shift || false;
+    pointerEvent.altKey = modifiers.alt || false;
+    pointerEvent.pointerId = 1;
+    pointerEvent.preventDefault = function() {};
+    pointerEvent.button = button;
+    pointerEvent.isPrimary = true;
     const event = new MapBrowserPointerEvent(type, map, pointerEvent);
-    event.pointerEvent.pointerId = 1;
     map.handleMapBrowserEvent(event);
   }
 
@@ -101,7 +102,7 @@ describe('ol.interaction.Modify', function() {
    * modifications. Helper function to
    * @param {ol.Feature} feature Modified feature.
    * @param {ol.interaction.Modify} interaction The interaction.
-   * @return {Array<ol.interaction.Modify.Event|string>} events
+   * @return {Array<ModifyEvent|string>} events
    */
   function trackEvents(feature, interaction) {
     const events = [];
@@ -121,7 +122,7 @@ describe('ol.interaction.Modify', function() {
   * Validates the event array to verify proper event sequence. Checks
   * that first and last event are correct ModifyEvents and that feature
   * modifications event are in between.
-  * @param {Array<ol.interaction.Modify.Event|string>} events The events.
+  * @param {Array<ModifyEvent|string>} events The events.
   * @param {Array<ol.Feature>} features The features.
   */
   function validateEvents(events, features) {
@@ -130,11 +131,11 @@ describe('ol.interaction.Modify', function() {
     const endevent = events[events.length - 1];
 
     // first event should be modifystary
-    expect(startevent).to.be.an(Modify.Event);
+    expect(startevent).to.be.a(ModifyEvent);
     expect(startevent.type).to.eql('modifystart');
 
     // last event should be modifyend
-    expect(endevent).to.be.an(Modify.Event);
+    expect(endevent).to.be.a(ModifyEvent);
     expect(endevent.type).to.eql('modifyend');
 
     // make sure we get change events to events array
@@ -608,10 +609,10 @@ describe('ol.interaction.Modify', function() {
 
     beforeEach(function() {
       getModifyListeners = function(feature, modify) {
-        const listeners = getListeners(
-          feature, 'change');
+        const listeners = feature.listeners_['change'];
+        const candidates = getValues(modify);
         return listeners.filter(function(listener) {
-          return listener.bindTo === modify;
+          return candidates.indexOf(listener) !== -1;
         });
       };
     });
@@ -695,6 +696,24 @@ describe('ol.interaction.Modify', function() {
     });
   });
 
+  describe('handle feature removal during down-up sequence', function() {
+    it('removes segment data of removed features from dragSegments_', function() {
+      const collection = new Collection(features);
+      const modify = new Modify({
+        features: collection
+      });
+      map.addInteraction(modify);
+      simulateEvent('pointermove', 0, 0, null, 0);
+      simulateEvent('pointerdown', 0, 0, null, 0);
+      simulateEvent('pointermove', -10, -10, null, 0);
+      simulateEvent('pointerdrag', -10, -10, null, 0);
+      collection.remove(features[0]);
+      expect(function() {
+        simulateEvent('pointerup', -10, -10, null, 0);
+      }).to.not.throwException();
+    });
+  });
+
   describe('#setActive', function() {
     it('removes the vertexFeature of deactivation', function() {
       const modify = new Modify({
@@ -708,6 +727,54 @@ describe('ol.interaction.Modify', function() {
 
       modify.setActive(false);
       expect(modify.vertexFeature_).to.be(null);
+    });
+  });
+
+  describe('#getOverlay', function() {
+    it('returns the feature overlay layer', function() {
+      const modify = new Modify({
+        features: new Collection()
+      });
+      expect (modify.getOverlay()).to.eql(modify.overlay_);
+    });
+  });
+
+  describe('circle modification with snap', function() {
+    it('changes the circle radius and center', function() {
+      const circleFeature = new Feature(new Circle([10, 10], 20));
+      features.length = 0;
+      features.push(circleFeature);
+
+      const modify = new Modify({
+        features: new Collection(features)
+      });
+      map.addInteraction(modify);
+
+      const snap = new Snap({
+        features: new Collection(features),
+        pixelTolerance: 1
+      });
+      map.addInteraction(snap);
+
+      // Change center
+      simulateEvent('pointermove', 10, -10, null, 0);
+      simulateEvent('pointerdown', 10, -10, null, 0);
+      simulateEvent('pointermove', 5, -5, null, 0);
+      simulateEvent('pointerdrag', 5, -5, null, 0);
+      simulateEvent('pointerup', 5, -5, null, 0);
+
+      expect(circleFeature.getGeometry().getRadius()).to.equal(20);
+      expect(circleFeature.getGeometry().getCenter()).to.eql([5, 5]);
+
+      // Increase radius
+      simulateEvent('pointermove', 25, -4, null, 0);
+      simulateEvent('pointerdown', 25, -4, null, 0);
+      simulateEvent('pointermove', 30, -5, null, 0);
+      simulateEvent('pointerdrag', 30, -5, null, 0);
+      simulateEvent('pointerup', 30, -5, null, 0);
+
+      expect(circleFeature.getGeometry().getRadius()).to.equal(25);
+      expect(circleFeature.getGeometry().getCenter()).to.eql([5, 5]);
     });
   });
 

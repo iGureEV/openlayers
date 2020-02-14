@@ -1,7 +1,6 @@
 /**
  * @module ol/has
  */
-import {HAS_WEBGL} from './index.js';
 
 const ua = typeof navigator !== 'undefined' ?
   navigator.userAgent.toLowerCase() : '';
@@ -40,60 +39,28 @@ export const MAC = ua.indexOf('macintosh') !== -1;
  */
 export const DEVICE_PIXEL_RATIO = window.devicePixelRatio || 1;
 
-
 /**
- * True if the browser's Canvas implementation implements {get,set}LineDash.
+ * Image.prototype.decode() is supported.
  * @type {boolean}
  */
-export const CANVAS_LINE_DASH = function() {
-  let has = false;
+export const IMAGE_DECODE = typeof Image !== 'undefined' && Image.prototype.decode;
+
+/**
+ * @type {boolean}
+ */
+export const PASSIVE_EVENT_LISTENERS = (function() {
+  let passive = false;
   try {
-    has = !!document.createElement('CANVAS').getContext('2d').setLineDash;
-  } catch (e) {
-    // pass
+    const options = Object.defineProperty({}, 'passive', {
+      get: function() {
+        passive = true;
+      }
+    });
+
+    window.addEventListener('_', null, options);
+    window.removeEventListener('_', null, options);
+  } catch (error) {
+    // passive not supported
   }
-  return has;
-}();
-
-
-/**
- * Is HTML5 geolocation supported in the current browser?
- * @const
- * @type {boolean}
- * @api
- */
-export const GEOLOCATION = 'geolocation' in navigator;
-
-
-/**
- * True if browser supports touch events.
- * @const
- * @type {boolean}
- * @api
- */
-export const TOUCH = 'ontouchstart' in window;
-
-
-/**
- * True if browser supports pointer events.
- * @const
- * @type {boolean}
- */
-export const POINTER = 'PointerEvent' in window;
-
-
-/**
- * True if browser supports ms pointer events (IE 10).
- * @const
- * @type {boolean}
- */
-export const MSPOINTER = !!(navigator.msPointerEnabled);
-
-
-/**
- * True if both OpenLayers and browser support WebGL.
- * @const
- * @type {boolean}
- * @api
- */
-export const WEBGL = HAS_WEBGL;
+  return passive;
+})();

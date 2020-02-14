@@ -8,7 +8,6 @@ import Polygon from '../../../../src/ol/geom/Polygon.js';
 import Interaction from '../../../../src/ol/interaction/Interaction.js';
 import Select from '../../../../src/ol/interaction/Select.js';
 import VectorLayer from '../../../../src/ol/layer/Vector.js';
-import PointerEvent from '../../../../src/ol/pointer/PointerEvent.js';
 import VectorSource from '../../../../src/ol/source/Vector.js';
 
 
@@ -92,11 +91,13 @@ describe('ol.interaction.Select', function() {
     // calculated in case body has top < 0 (test runner with small window)
     const position = viewport.getBoundingClientRect();
     const shiftKey = opt_shiftKey !== undefined ? opt_shiftKey : false;
-    const event = new PointerEvent(type, {
+    const event = {
+      type: type,
+      target: viewport.firstChild,
       clientX: position.left + x + width / 2,
       clientY: position.top + y + height / 2,
       shiftKey: shiftKey
-    });
+    };
     map.handleMapBrowserEvent(new MapBrowserPointerEvent(type, map, event));
   }
 
@@ -224,7 +225,7 @@ describe('ol.interaction.Select', function() {
       expect(features.getLength()).to.equal(4);
       expect(select.getLayer(features.item(0))).to.equal(layer);
 
-      // Select again to make sure the internal layer isn't reported
+      // Select again to make sure the style change does not break selection
       simulateEvent('singleclick', 10, -20);
 
       expect(listenerSpy.callCount).to.be(1);
@@ -260,10 +261,10 @@ describe('ol.interaction.Select', function() {
 
       simulateEvent('singleclick', 10, -20, true);
 
-      expect(listenerSpy.callCount).to.be(2);
+      expect(listenerSpy.callCount).to.be(1);
 
       features = select.getFeatures();
-      expect(features.getLength()).to.equal(0);
+      expect(features.getLength()).to.equal(4);
     });
   });
 
@@ -363,7 +364,7 @@ describe('ol.interaction.Select', function() {
       interaction.on('select', listenerSpy);
 
       simulateEvent('singleclick', 10, -20);
-      // Select again to make sure that the internal layer doesn't get reported.
+      // Select again to make sure the style change does not break selection
       simulateEvent('singleclick', 10, -20);
     });
   });
@@ -377,8 +378,6 @@ describe('ol.interaction.Select', function() {
       expect(interaction.getActive()).to.be(true);
 
       map.addInteraction(interaction);
-
-      expect(interaction.featureOverlay_).not.to.be(null);
 
       simulateEvent('singleclick', 10, -20);
     });
@@ -406,40 +405,5 @@ describe('ol.interaction.Select', function() {
       });
     });
 
-  });
-
-  describe('#setMap()', function() {
-    let interaction;
-
-    beforeEach(function() {
-      interaction = new Select();
-      expect(interaction.getActive()).to.be(true);
-    });
-
-    describe('#setMap(null)', function() {
-      beforeEach(function() {
-        map.addInteraction(interaction);
-      });
-      afterEach(function() {
-        map.removeInteraction(interaction);
-      });
-      describe('#setMap(null) when interaction is active', function() {
-        it('unsets the map from the feature overlay', function() {
-          const spy = sinon.spy(interaction.featureOverlay_, 'setMap');
-          interaction.setMap(null);
-          expect(spy.getCall(0).args[0]).to.be(null);
-        });
-      });
-    });
-
-    describe('#setMap(map)', function() {
-      describe('#setMap(map) when interaction is active', function() {
-        it('sets the map into the feature overlay', function() {
-          const spy = sinon.spy(interaction.featureOverlay_, 'setMap');
-          interaction.setMap(map);
-          expect(spy.getCall(0).args[0]).to.be(map);
-        });
-      });
-    });
   });
 });

@@ -1,9 +1,7 @@
-// NOCOMPILE
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
 import ImageLayer from '../src/ol/layer/Image.js';
-import RasterSource from '../src/ol/source/Raster.js';
-import Stamen from '../src/ol/source/Stamen.js';
+import {Raster as RasterSource, Stamen} from '../src/ol/source.js';
 
 
 /**
@@ -22,8 +20,8 @@ const twoPi = 2 * Math.PI;
 
 /**
  * Convert an RGB pixel into an HCL pixel.
- * @param {Array.<number>} pixel A pixel in RGB space.
- * @return {Array.<number>} A pixel in HCL space.
+ * @param {Array<number>} pixel A pixel in RGB space.
+ * @return {Array<number>} A pixel in HCL space.
  */
 function rgb2hcl(pixel) {
   const red = rgb2xyz(pixel[0]);
@@ -57,8 +55,8 @@ function rgb2hcl(pixel) {
 
 /**
  * Convert an HCL pixel into an RGB pixel.
- * @param {Array.<number>} pixel A pixel in HCL space.
- * @return {Array.<number>} A pixel in RGB space.
+ * @param {Array<number>} pixel A pixel in HCL space.
+ * @return {Array<number>} A pixel in RGB space.
  */
 function hcl2rgb(pixel) {
   const h = pixel[0];
@@ -102,8 +100,7 @@ function xyz2rgb(x) {
 
 const raster = new RasterSource({
   sources: [new Stamen({
-    layer: 'watercolor',
-    transition: 0
+    layer: 'watercolor'
   })],
   operation: function(pixels, data) {
     const hcl = rgb2hcl(pixels[0]);

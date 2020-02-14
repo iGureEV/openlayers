@@ -1,65 +1,71 @@
 /**
  * @module ol/interaction/DoubleClickZoom
  */
-import {inherits} from '../index.js';
 import MapBrowserEventType from '../MapBrowserEventType.js';
-import Interaction from '../interaction/Interaction.js';
+import Interaction, {zoomByDelta} from './Interaction.js';
+
+
+/**
+ * @typedef {Object} Options
+ * @property {number} [duration=250] Animation duration in milliseconds.
+ * @property {number} [delta=1] The zoom delta applied on each double click.
+ */
+
 
 /**
  * @classdesc
  * Allows the user to zoom by double-clicking on the map.
- *
- * @constructor
- * @extends {ol.interaction.Interaction}
- * @param {olx.interaction.DoubleClickZoomOptions=} opt_options Options.
  * @api
  */
-const DoubleClickZoom = function(opt_options) {
-
-  const options = opt_options ? opt_options : {};
+class DoubleClickZoom extends Interaction {
 
   /**
-   * @private
-   * @type {number}
+   * @param {Options=} opt_options Options.
    */
-  this.delta_ = options.delta ? options.delta : 1;
+  constructor(opt_options) {
+    super({
+      handleEvent: handleEvent
+    });
 
-  Interaction.call(this, {
-    handleEvent: DoubleClickZoom.handleEvent
-  });
+    const options = opt_options ? opt_options : {};
 
-  /**
-   * @private
-   * @type {number}
-   */
-  this.duration_ = options.duration !== undefined ? options.duration : 250;
+    /**
+     * @private
+     * @type {number}
+     */
+    this.delta_ = options.delta ? options.delta : 1;
 
-};
+    /**
+     * @private
+     * @type {number}
+     */
+    this.duration_ = options.duration !== undefined ? options.duration : 250;
 
-inherits(DoubleClickZoom, Interaction);
+  }
+
+}
 
 
 /**
- * Handles the {@link ol.MapBrowserEvent map browser event} (if it was a
+ * Handles the {@link module:ol/MapBrowserEvent map browser event} (if it was a
  * doubleclick) and eventually zooms the map.
- * @param {ol.MapBrowserEvent} mapBrowserEvent Map browser event.
+ * @param {import("../MapBrowserEvent.js").default} mapBrowserEvent Map browser event.
  * @return {boolean} `false` to stop event propagation.
- * @this {ol.interaction.DoubleClickZoom}
- * @api
+ * @this {DoubleClickZoom}
  */
-DoubleClickZoom.handleEvent = function(mapBrowserEvent) {
+function handleEvent(mapBrowserEvent) {
   let stopEvent = false;
-  const browserEvent = mapBrowserEvent.originalEvent;
   if (mapBrowserEvent.type == MapBrowserEventType.DBLCLICK) {
+    const browserEvent = /** @type {MouseEvent} */ (mapBrowserEvent.originalEvent);
     const map = mapBrowserEvent.map;
     const anchor = mapBrowserEvent.coordinate;
     const delta = browserEvent.shiftKey ? -this.delta_ : this.delta_;
     const view = map.getView();
-    Interaction.zoomByDelta(
-      view, delta, anchor, this.duration_);
+    zoomByDelta(view, delta, anchor, this.duration_);
     mapBrowserEvent.preventDefault();
     stopEvent = true;
   }
   return !stopEvent;
-};
+}
+
 export default DoubleClickZoom;

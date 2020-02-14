@@ -8,7 +8,7 @@ describe('ol.control.Control', function() {
     map = new Map({
       target: document.createElement('div')
     });
-    const element = document.createElement('DIV');
+    const element = document.createElement('div');
     control = new Control({element: element});
     control.setMap(map);
   });
@@ -52,5 +52,29 @@ describe('ol.control.Control\'s target', function() {
       expect(ctrl.target_).to.equal(null);
       ctrl.dispose();
     });
+  });
+});
+
+describe('ol.control.Control\'s event target', function() {
+  it('is the Control when the Control uses the default target', function(done) {
+    const ctrl = new Control({element: document.createElement('div')});
+    ctrl.on('test-event', function(e) {
+      expect(e.target).to.be(ctrl);
+      done();
+    });
+    ctrl.dispatchEvent('test-event');
+    ctrl.dispose();
+  });
+  it('is the Control when the Control has a custom target', function(done) {
+    const ctrl = new Control({
+      element: document.createElement('div'),
+      target: document.createElement('div')
+    });
+    ctrl.on('test-event', function(e) {
+      expect(e.target).to.be(ctrl);
+      done();
+    });
+    ctrl.dispatchEvent('test-event');
+    ctrl.dispose();
   });
 });

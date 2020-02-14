@@ -1,15 +1,12 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import * as _ol_extent_ from '../src/ol/extent.js';
+import {getWidth, getCenter} from '../src/ol/extent.js';
 import WMTSCapabilities from '../src/ol/format/WMTSCapabilities.js';
 import TileLayer from '../src/ol/layer/Tile.js';
 import {get as getProjection} from '../src/ol/proj.js';
 import {register} from '../src/ol/proj/proj4.js';
-import OSM from '../src/ol/source/OSM.js';
-import TileImage from '../src/ol/source/TileImage.js';
-import TileWMS from '../src/ol/source/TileWMS.js';
-import WMTS from '../src/ol/source/WMTS.js';
-import XYZ from '../src/ol/source/XYZ.js';
+import {OSM, TileImage, TileWMS, XYZ} from '../src/ol/source.js';
+import WMTS, {optionsFromCapabilities} from '../src/ol/source/WMTS.js';
 import TileGrid from '../src/ol/tilegrid/TileGrid.js';
 import proj4 from 'proj4';
 
@@ -58,15 +55,6 @@ proj54009.setExtent([-18e6, -9e6, 18e6, 9e6]);
 
 const layers = {};
 
-layers['bng'] = new TileLayer({
-  source: new XYZ({
-    projection: 'EPSG:27700',
-    url: 'https://tileserver.maptiler.com/miniscale/{z}/{x}/{y}.png',
-    crossOrigin: '',
-    maxZoom: 6
-  })
-});
-
 layers['osm'] = new TileLayer({
   source: new OSM()
 });
@@ -98,22 +86,38 @@ layers['wms21781'] = new TileLayer({
 });
 
 const parser = new WMTSCapabilities();
-const url = 'https://map1.vis.earthdata.nasa.gov/wmts-arctic/' +
+
+layers['wmts3413'] = new TileLayer();
+const urlA = 'https://map1.vis.earthdata.nasa.gov/wmts-arctic/' +
     'wmts.cgi?SERVICE=WMTS&request=GetCapabilities';
-fetch(url).then(function(response) {
+fetch(urlA).then(function(response) {
   return response.text();
 }).then(function(text) {
   const result = parser.read(text);
-  const options = WMTS.optionsFromCapabilities(result, {
+  const options = optionsFromCapabilities(result, {
     layer: 'OSM_Land_Mask',
     matrixSet: 'EPSG3413_250m'
   });
   options.crossOrigin = '';
   options.projection = 'EPSG:3413';
   options.wrapX = false;
-  layers['wmts3413'] = new TileLayer({
-    source: new WMTS(/** @type {!olx.source.WMTSOptions} */ (options))
+  layers['wmts3413'].setSource(new WMTS(options));
+});
+
+layers['bng'] = new TileLayer();
+const urlB = 'https://tiles.arcgis.com/tiles/qHLhLQrcvEnxjtPr/arcgis/rest/services/OS_Open_Raster/MapServer/WMTS';
+fetch(urlB).then(function(response) {
+  return response.text();
+}).then(function(text) {
+  const result = parser.read(text);
+  const options = optionsFromCapabilities(result, {
+    layer: 'OS_Open_Raster'
   });
+  options.attributions = 'Contains OS data © Crown Copyright and database right 2019';
+  options.crossOrigin = '';
+  options.projection = 'EPSG:27700';
+  options.wrapX = false;
+  layers['bng'].setSource(new WMTS(options));
 });
 
 layers['grandcanyon'] = new TileLayer({
@@ -128,7 +132,7 @@ layers['grandcanyon'] = new TileLayer({
 });
 
 const startResolution =
-    _ol_extent_.getWidth(getProjection('EPSG:3857').getExtent()) / 256;
+    getWidth(getProjection('EPSG:3857').getExtent()) / 256;
 const resolutions = new Array(22);
 for (let i = 0, ii = resolutions.length; i < ii; ++i) {
   resolutions[i] = startResolution / Math.pow(2, i);
@@ -175,7 +179,7 @@ function updateViewProjection() {
   const newProjExtent = newProj.getExtent();
   const newView = new View({
     projection: newProj,
-    center: _ol_extent_.getCenter(newProjExtent || [0, 0, 0, 0]),
+    center: getCenter(newProjExtent || [0, 0, 0, 0]),
     zoom: 0,
     extent: newProjExtent || undefined
   });

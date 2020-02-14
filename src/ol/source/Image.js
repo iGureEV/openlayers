@@ -1,15 +1,15 @@
 /**
  * @module ol/source/Image
  */
+import {abstract} from '../util.js';
 import {ENABLE_RASTER_REPROJECTION} from '../reproj/common.js';
-import {inherits} from '../index.js';
 import ImageState from '../ImageState.js';
 import {linearFindNearest} from '../array.js';
 import Event from '../events/Event.js';
 import {equals} from '../extent.js';
 import {equivalent} from '../proj.js';
 import ReprojImage from '../reproj/Image.js';
-import Source from '../source/Source.js';
+import Source from './Source.js';
 
 
 /**
@@ -19,21 +19,21 @@ const ImageSourceEventType = {
 
   /**
    * Triggered when an image starts loading.
-   * @event ol.source.Image.Event#imageloadstart
+   * @event module:ol/source/Image.ImageSourceEvent#imageloadstart
    * @api
    */
   IMAGELOADSTART: 'imageloadstart',
 
   /**
    * Triggered when an image finishes loading.
-   * @event ol.source.Image.Event#imageloadend
+   * @event module:ol/source/Image.ImageSourceEvent#imageloadend
    * @api
    */
   IMAGELOADEND: 'imageloadend',
 
   /**
    * Triggered if image loading results in an error.
-   * @event ol.source.Image.Event#imageloaderror
+   * @event module:ol/source/Image.ImageSourceEvent#imageloaderror
    * @api
    */
   IMAGELOADERROR: 'imageloaderror'
@@ -43,191 +43,198 @@ const ImageSourceEventType = {
 
 /**
  * @classdesc
- * Abstract base class; normally only used for creating subclasses and not
- * instantiated in apps.
- * Base class for sources providing a single image.
- *
- * @constructor
- * @abstract
- * @extends {ol.source.Source}
- * @param {ol.SourceImageOptions} options Single image source options.
- * @api
+ * Events emitted by {@link module:ol/source/Image~ImageSource} instances are instances of this
+ * type.
  */
-const ImageSource = function(options) {
-  Source.call(this, {
-    attributions: options.attributions,
-    extent: options.extent,
-    projection: options.projection,
-    state: options.state
-  });
-
+export class ImageSourceEvent extends Event {
   /**
-   * @private
-   * @type {Array.<number>}
+   * @param {string} type Type.
+   * @param {import("../Image.js").default} image The image.
    */
-  this.resolutions_ = options.resolutions !== undefined ?
-    options.resolutions : null;
+  constructor(type, image) {
 
+    super(type);
 
-  /**
-   * @private
-   * @type {ol.reproj.Image}
-   */
-  this.reprojectedImage_ = null;
+    /**
+     * The image related to the event.
+     * @type {import("../Image.js").default}
+     * @api
+     */
+    this.image = image;
 
-
-  /**
-   * @private
-   * @type {number}
-   */
-  this.reprojectedRevision_ = 0;
-};
-
-inherits(ImageSource, Source);
-
-
-/**
- * @return {Array.<number>} Resolutions.
- * @override
- */
-ImageSource.prototype.getResolutions = function() {
-  return this.resolutions_;
-};
-
-
-/**
- * @protected
- * @param {number} resolution Resolution.
- * @return {number} Resolution.
- */
-ImageSource.prototype.findNearestResolution = function(resolution) {
-  if (this.resolutions_) {
-    const idx = linearFindNearest(this.resolutions_, resolution, 0);
-    resolution = this.resolutions_[idx];
   }
-  return resolution;
-};
+
+}
 
 
 /**
- * @param {ol.Extent} extent Extent.
- * @param {number} resolution Resolution.
- * @param {number} pixelRatio Pixel ratio.
- * @param {ol.proj.Projection} projection Projection.
- * @return {ol.ImageBase} Single image.
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions]
+ * @property {import("../proj.js").ProjectionLike} [projection]
+ * @property {Array<number>} [resolutions]
+ * @property {import("./State.js").default} [state]
  */
-ImageSource.prototype.getImage = function(extent, resolution, pixelRatio, projection) {
-  const sourceProjection = this.getProjection();
-  if (!ENABLE_RASTER_REPROJECTION ||
-      !sourceProjection ||
-      !projection ||
-      equivalent(sourceProjection, projection)) {
-    if (sourceProjection) {
-      projection = sourceProjection;
-    }
-    return this.getImageInternal(extent, resolution, pixelRatio, projection);
-  } else {
-    if (this.reprojectedImage_) {
-      if (this.reprojectedRevision_ == this.getRevision() &&
-          equivalent(
-            this.reprojectedImage_.getProjection(), projection) &&
-          this.reprojectedImage_.getResolution() == resolution &&
-          equals(this.reprojectedImage_.getExtent(), extent)) {
-        return this.reprojectedImage_;
-      }
-      this.reprojectedImage_.dispose();
-      this.reprojectedImage_ = null;
-    }
-
-    this.reprojectedImage_ = new ReprojImage(
-      sourceProjection, projection, extent, resolution, pixelRatio,
-      function(extent, resolution, pixelRatio) {
-        return this.getImageInternal(extent, resolution,
-          pixelRatio, sourceProjection);
-      }.bind(this));
-    this.reprojectedRevision_ = this.getRevision();
-
-    return this.reprojectedImage_;
-  }
-};
-
-
-/**
- * @abstract
- * @param {ol.Extent} extent Extent.
- * @param {number} resolution Resolution.
- * @param {number} pixelRatio Pixel ratio.
- * @param {ol.proj.Projection} projection Projection.
- * @return {ol.ImageBase} Single image.
- * @protected
- */
-ImageSource.prototype.getImageInternal = function(extent, resolution, pixelRatio, projection) {};
-
-
-/**
- * Handle image change events.
- * @param {ol.events.Event} event Event.
- * @protected
- */
-ImageSource.prototype.handleImageChange = function(event) {
-  const image = /** @type {ol.Image} */ (event.target);
-  switch (image.getState()) {
-    case ImageState.LOADING:
-      this.dispatchEvent(
-        new ImageSource.Event(ImageSourceEventType.IMAGELOADSTART,
-          image));
-      break;
-    case ImageState.LOADED:
-      this.dispatchEvent(
-        new ImageSource.Event(ImageSourceEventType.IMAGELOADEND,
-          image));
-      break;
-    case ImageState.ERROR:
-      this.dispatchEvent(
-        new ImageSource.Event(ImageSourceEventType.IMAGELOADERROR,
-          image));
-      break;
-    default:
-      // pass
-  }
-};
-
-
-/**
- * Default image load function for image sources that use ol.Image image
- * instances.
- * @param {ol.Image} image Image.
- * @param {string} src Source.
- */
-ImageSource.defaultImageLoadFunction = function(image, src) {
-  image.getImage().src = src;
-};
 
 
 /**
  * @classdesc
- * Events emitted by {@link ol.source.Image} instances are instances of this
- * type.
- *
- * @constructor
- * @extends {ol.events.Event}
- * @implements {oli.source.ImageEvent}
- * @param {string} type Type.
- * @param {ol.Image} image The image.
+ * Abstract base class; normally only used for creating subclasses and not
+ * instantiated in apps.
+ * Base class for sources providing a single image.
+ * @abstract
+ * @fires module:ol/source/Image.ImageSourceEvent
+ * @api
  */
-ImageSource.Event = function(type, image) {
+class ImageSource extends Source {
+  /**
+   * @param {Options} options Single image source options.
+   */
+  constructor(options) {
+    super({
+      attributions: options.attributions,
+      projection: options.projection,
+      state: options.state
+    });
 
-  Event.call(this, type);
+    /**
+     * @private
+     * @type {Array<number>}
+     */
+    this.resolutions_ = options.resolutions !== undefined ?
+      options.resolutions : null;
+
+
+    /**
+     * @private
+     * @type {import("../reproj/Image.js").default}
+     */
+    this.reprojectedImage_ = null;
+
+
+    /**
+     * @private
+     * @type {number}
+     */
+    this.reprojectedRevision_ = 0;
+  }
 
   /**
-   * The image related to the event.
-   * @type {ol.Image}
-   * @api
+   * @return {Array<number>} Resolutions.
+   * @override
    */
-  this.image = image;
+  getResolutions() {
+    return this.resolutions_;
+  }
 
-};
-inherits(ImageSource.Event, Event);
+  /**
+   * @protected
+   * @param {number} resolution Resolution.
+   * @return {number} Resolution.
+   */
+  findNearestResolution(resolution) {
+    if (this.resolutions_) {
+      const idx = linearFindNearest(this.resolutions_, resolution, 0);
+      resolution = this.resolutions_[idx];
+    }
+    return resolution;
+  }
 
+  /**
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {number} resolution Resolution.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @return {import("../ImageBase.js").default} Single image.
+   */
+  getImage(extent, resolution, pixelRatio, projection) {
+    const sourceProjection = this.getProjection();
+    if (!ENABLE_RASTER_REPROJECTION ||
+        !sourceProjection ||
+        !projection ||
+        equivalent(sourceProjection, projection)) {
+      if (sourceProjection) {
+        projection = sourceProjection;
+      }
+      return this.getImageInternal(extent, resolution, pixelRatio, projection);
+    } else {
+      if (this.reprojectedImage_) {
+        if (this.reprojectedRevision_ == this.getRevision() &&
+            equivalent(
+              this.reprojectedImage_.getProjection(), projection) &&
+            this.reprojectedImage_.getResolution() == resolution &&
+            equals(this.reprojectedImage_.getExtent(), extent)) {
+          return this.reprojectedImage_;
+        }
+        this.reprojectedImage_.dispose();
+        this.reprojectedImage_ = null;
+      }
+
+      this.reprojectedImage_ = new ReprojImage(
+        sourceProjection, projection, extent, resolution, pixelRatio,
+        function(extent, resolution, pixelRatio) {
+          return this.getImageInternal(extent, resolution,
+            pixelRatio, sourceProjection);
+        }.bind(this));
+      this.reprojectedRevision_ = this.getRevision();
+
+      return this.reprojectedImage_;
+    }
+  }
+
+  /**
+   * @abstract
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {number} resolution Resolution.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @return {import("../ImageBase.js").default} Single image.
+   * @protected
+   */
+  getImageInternal(extent, resolution, pixelRatio, projection) {
+    return abstract();
+  }
+
+  /**
+   * Handle image change events.
+   * @param {import("../events/Event.js").default} event Event.
+   * @protected
+   */
+  handleImageChange(event) {
+    const image = /** @type {import("../Image.js").default} */ (event.target);
+    switch (image.getState()) {
+      case ImageState.LOADING:
+        this.loading = true;
+        this.dispatchEvent(
+          new ImageSourceEvent(ImageSourceEventType.IMAGELOADSTART,
+            image));
+        break;
+      case ImageState.LOADED:
+        this.loading = false;
+        this.dispatchEvent(
+          new ImageSourceEvent(ImageSourceEventType.IMAGELOADEND,
+            image));
+        break;
+      case ImageState.ERROR:
+        this.loading = false;
+        this.dispatchEvent(
+          new ImageSourceEvent(ImageSourceEventType.IMAGELOADERROR,
+            image));
+        break;
+      default:
+        // pass
+    }
+  }
+}
+
+
+/**
+ * Default image load function for image sources that use import("../Image.js").Image image
+ * instances.
+ * @param {import("../Image.js").default} image Image.
+ * @param {string} src Source.
+ */
+export function defaultImageLoadFunction(image, src) {
+  /** @type {HTMLImageElement|HTMLVideoElement} */ (image.getImage()).src = src;
+}
 
 export default ImageSource;

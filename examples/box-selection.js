@@ -2,12 +2,9 @@ import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
 import {platformModifierKeyOnly} from '../src/ol/events/condition.js';
 import GeoJSON from '../src/ol/format/GeoJSON.js';
-import DragBox from '../src/ol/interaction/DragBox.js';
-import Select from '../src/ol/interaction/Select.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import VectorLayer from '../src/ol/layer/Vector.js';
-import OSM from '../src/ol/source/OSM.js';
-import VectorSource from '../src/ol/source/Vector.js';
+import {DragBox, Select} from '../src/ol/interaction.js';
+import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
+import {OSM, Vector as VectorSource} from '../src/ol/source.js';
 
 
 const vectorSource = new VectorSource({
@@ -28,7 +25,8 @@ const map = new Map({
   target: 'map',
   view: new View({
     center: [0, 0],
-    zoom: 2
+    zoom: 2,
+    constrainRotation: 16
   })
 });
 
@@ -46,12 +44,39 @@ const dragBox = new DragBox({
 map.addInteraction(dragBox);
 
 dragBox.on('boxend', function() {
-  // features that intersect the box are added to the collection of
-  // selected features
+  // features that intersect the box geometry are added to the
+  // collection of selected features
+
+  // if the view is not obliquely rotated the box geometry and
+  // its extent are equalivalent so intersecting features can
+  // be added directly to the collection
+  const rotation = map.getView().getRotation();
+  const oblique = rotation % (Math.PI / 2) !== 0;
+  const candidateFeatures = oblique ? [] : selectedFeatures;
   const extent = dragBox.getGeometry().getExtent();
   vectorSource.forEachFeatureIntersectingExtent(extent, function(feature) {
-    selectedFeatures.push(feature);
+    candidateFeatures.push(feature);
   });
+
+  // when the view is obliquely rotated the box extent will
+  // exceed its geometry so both the box and the candidate
+  // feature geometries are rotated around a common anchor
+  // to confirm that, with the box geometry aligned with its
+  // extent, the geometries intersect
+  if (oblique) {
+    const anchor = [0, 0];
+    const geometry = dragBox.getGeometry().clone();
+    geometry.rotate(-rotation, anchor);
+    const extent = geometry.getExtent();
+    candidateFeatures.forEach(function(feature) {
+      const geometry = feature.getGeometry().clone();
+      geometry.rotate(-rotation, anchor);
+      if (geometry.intersectsExtent(extent)) {
+        selectedFeatures.push(feature);
+      }
+    });
+  }
+
 });
 
 // clear selection when drawing a new box and when clicking on the map

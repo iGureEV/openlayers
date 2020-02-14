@@ -1,5 +1,5 @@
 import Feature from '../../../../src/ol/Feature.js';
-import * as _ol_extent_ from '../../../../src/ol/extent.js';
+import {equals} from '../../../../src/ol/extent.js';
 import GeoJSON from '../../../../src/ol/format/GeoJSON.js';
 import Circle from '../../../../src/ol/geom/Circle.js';
 import GeometryCollection from '../../../../src/ol/geom/GeometryCollection.js';
@@ -8,7 +8,7 @@ import LinearRing from '../../../../src/ol/geom/LinearRing.js';
 import MultiPolygon from '../../../../src/ol/geom/MultiPolygon.js';
 import Point from '../../../../src/ol/geom/Point.js';
 import Polygon from '../../../../src/ol/geom/Polygon.js';
-import {fromLonLat, get as getProjection, toLonLat, transform} from '../../../../src/ol/proj.js';
+import {fromLonLat, get as getProjection, toLonLat, transform, Projection} from '../../../../src/ol/proj.js';
 
 
 describe('ol.format.GeoJSON', function() {
@@ -260,6 +260,28 @@ describe('ol.format.GeoJSON', function() {
       expect(feature.getGeometry()).to.be.an(Point);
     });
 
+    it('transforms tile pixel coordinates', function() {
+      const geojson = {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [1024, 1024]
+        }
+      };
+      const format = new GeoJSON({
+        dataProjection: new Projection({
+          code: '',
+          units: 'tile-pixels',
+          extent: [0, 0, 4096, 4096]
+        })
+      });
+      const feature = format.readFeature(geojson, {
+        extent: [-180, -90, 180, 90],
+        featureProjection: 'EPSG:3857'
+      });
+      expect(feature.getGeometry().getCoordinates()).to.eql([-135, 45]);
+    });
+
   });
 
   describe('#readFeatures', function() {
@@ -302,7 +324,7 @@ describe('ol.format.GeoJSON', function() {
         expect(first.getId()).to.be('AFG');
         const firstGeom = first.getGeometry();
         expect(firstGeom).to.be.a(Polygon);
-        expect(_ol_extent_.equals(firstGeom.getExtent(),
+        expect(equals(firstGeom.getExtent(),
           [60.52843, 29.318572, 75.158028, 38.486282]))
           .to.be(true);
 
@@ -312,7 +334,7 @@ describe('ol.format.GeoJSON', function() {
         expect(last.getId()).to.be('ZWE');
         const lastGeom = last.getGeometry();
         expect(lastGeom).to.be.a(Polygon);
-        expect(_ol_extent_.equals(lastGeom.getExtent(),
+        expect(equals(lastGeom.getExtent(),
           [25.264226, -22.271612, 32.849861, -15.507787]))
           .to.be(true);
         done();

@@ -9,6 +9,8 @@ import VectorLayer from '../../../../src/ol/layer/Vector.js';
 import {bbox as bboxStrategy} from '../../../../src/ol/loadingstrategy.js';
 import {get as getProjection, transformExtent, fromLonLat} from '../../../../src/ol/proj.js';
 import VectorSource from '../../../../src/ol/source/Vector.js';
+import GeoJSON from '../../../../src/ol/format/GeoJSON.js';
+import {getUid} from '../../../../src/ol/util.js';
 
 
 describe('ol.source.Vector', function() {
@@ -32,7 +34,7 @@ describe('ol.source.Vector', function() {
       it('does not call the callback', function() {
         const f = sinon.spy();
         vectorSource.forEachFeatureInExtent(infiniteExtent, f);
-        expect(f).not.to.be.called();
+        expect(f.called).to.be(false);
       });
 
     });
@@ -69,7 +71,7 @@ describe('ol.source.Vector', function() {
         const listener = sinon.spy();
         listen(vectorSource, 'change', listener);
         vectorSource.addFeature(pointFeature);
-        expect(listener).to.be.called();
+        expect(listener.called).to.be(true);
       });
 
       it('adds same id features only once', function() {
@@ -81,6 +83,35 @@ describe('ol.source.Vector', function() {
         source.addFeature(feature1);
         source.addFeature(feature2);
         expect(source.getFeatures().length).to.be(1);
+      });
+
+    });
+
+    describe('#hasFeature', function() {
+
+      it('returns true for added feature without id', function() {
+        const feature = new Feature();
+        vectorSource.addFeature(feature);
+        expect(vectorSource.hasFeature(feature)).to.be(true);
+      });
+
+      it('returns true for added feature with id', function() {
+        const feature = new Feature();
+        feature.setId('1');
+        vectorSource.addFeature(feature);
+        expect(vectorSource.hasFeature(feature)).to.be(true);
+      });
+
+      it('return false for removed feature', function() {
+        const feature = new Feature();
+        vectorSource.addFeature(feature);
+        vectorSource.removeFeature(feature);
+        expect(vectorSource.hasFeature(feature)).to.be(false);
+      });
+
+      it('returns false for non-added feature', function() {
+        const feature = new Feature();
+        expect(vectorSource.hasFeature(feature)).to.be(false);
       });
 
     });
@@ -118,6 +149,80 @@ describe('ol.source.Vector', function() {
 
   });
 
+  describe('clear and refresh', function() {
+
+    let map, source, spy;
+    beforeEach(function(done) {
+      source = new VectorSource({
+        format: new GeoJSON(),
+        url: 'spec/ol/source/vectorsource/single-feature.json'
+      });
+      const target = document.createElement('div');
+      target.style.width = '100px';
+      target.style.height = '100px';
+      document.body.appendChild(target);
+      map = new Map({
+        target: target,
+        layers: [
+          new VectorLayer({
+            source: source
+          })
+        ],
+        view: new View({
+          center: [0, 0],
+          zoom: 0
+        })
+      });
+      map.once('rendercomplete', function() {
+        spy = sinon.spy(source, 'loader_');
+        done();
+      });
+    });
+
+    afterEach(function() {
+      if (spy) {
+        source.loader_.restore();
+      }
+      document.body.removeChild(map.getTargetElement());
+      map.setTarget(null);
+    });
+
+    it('#refresh() reloads from server', function(done) {
+      expect(source.getFeatures()).to.have.length(1);
+      map.once('rendercomplete', function() {
+        expect(source.getFeatures()).to.have.length(1);
+        expect(spy.callCount).to.be(1);
+        done();
+      });
+      source.refresh();
+    });
+
+    it('#clear() removes all features from the source', function(done) {
+      expect(source.getFeatures()).to.have.length(1);
+      map.once('rendercomplete', function() {
+        expect(source.getFeatures()).to.have.length(0);
+        expect(spy.callCount).to.be(0);
+        done();
+      });
+      source.clear();
+    });
+
+    it('After #setUrl(), refresh() loads from the new url', function(done) {
+      source.loader_.restore();
+      spy = undefined;
+      expect(source.getFeatures()).to.have.length(1);
+      const oldCoordinates = source.getFeatures()[0].getGeometry().getCoordinates();
+      map.on('rendercomplete', function() {
+        expect(source.getFeatures()).to.have.length(1);
+        const newCoordinates = source.getFeatures()[0].getGeometry().getCoordinates();
+        expect(newCoordinates).to.not.eql(oldCoordinates);
+        done();
+      });
+      source.setUrl('spec/ol/data/point.json');
+      source.refresh();
+    });
+  });
+
   describe('when populated with 10 random points and a null', function() {
 
     let features;
@@ -138,8 +243,6 @@ describe('ol.source.Vector', function() {
     describe('#clear', function() {
 
       it('removes all features using fast path', function() {
-        const changeSpy = sinon.spy();
-        listen(vectorSource, 'change', changeSpy);
         const removeFeatureSpy = sinon.spy();
         listen(vectorSource, 'removefeature', removeFeatureSpy);
         const clearSourceSpy = sinon.spy();
@@ -147,17 +250,13 @@ describe('ol.source.Vector', function() {
         vectorSource.clear(true);
         expect(vectorSource.getFeatures()).to.eql([]);
         expect(vectorSource.isEmpty()).to.be(true);
-        expect(changeSpy).to.be.called();
-        expect(changeSpy.callCount).to.be(1);
-        expect(removeFeatureSpy).not.to.be.called();
+        expect(removeFeatureSpy.called).to.be(false);
         expect(removeFeatureSpy.callCount).to.be(0);
-        expect(clearSourceSpy).to.be.called();
+        expect(clearSourceSpy.called).to.be(true);
         expect(clearSourceSpy.callCount).to.be(1);
       });
 
       it('removes all features using slow path', function() {
-        const changeSpy = sinon.spy();
-        listen(vectorSource, 'change', changeSpy);
         const removeFeatureSpy = sinon.spy();
         listen(vectorSource, 'removefeature', removeFeatureSpy);
         const clearSourceSpy = sinon.spy();
@@ -165,11 +264,9 @@ describe('ol.source.Vector', function() {
         vectorSource.clear();
         expect(vectorSource.getFeatures()).to.eql([]);
         expect(vectorSource.isEmpty()).to.be(true);
-        expect(changeSpy).to.be.called();
-        expect(changeSpy.callCount).to.be(1);
-        expect(removeFeatureSpy).to.be.called();
+        expect(removeFeatureSpy.called).to.be(true);
         expect(removeFeatureSpy.callCount).to.be(features.length);
-        expect(clearSourceSpy).to.be.called();
+        expect(clearSourceSpy.called).to.be(true);
         expect(clearSourceSpy.callCount).to.be(1);
       });
 
@@ -227,7 +324,14 @@ describe('ol.source.Vector', function() {
         const listener = sinon.spy();
         listen(vectorSource, 'change', listener);
         vectorSource.removeFeature(features[0]);
-        expect(listener).to.be.called();
+        expect(listener.called).to.be(true);
+      });
+
+      it('fires a removefeature event', function() {
+        const listener = sinon.spy();
+        listen(vectorSource, 'removefeature', listener);
+        vectorSource.removeFeature(features[0]);
+        expect(listener.called).to.be(true);
       });
 
     });
@@ -313,7 +417,7 @@ describe('ol.source.Vector', function() {
       const listener = sinon.spy();
       listen(vectorSource, 'change', listener);
       feature.set('foo', 'bar');
-      expect(listener).to.be.called();
+      expect(listener.called).to.be(true);
     });
 
     it('fires a changefeature event when updating a feature', function() {
@@ -324,7 +428,7 @@ describe('ol.source.Vector', function() {
       });
       vectorSource.on('changefeature', listener);
       feature.setStyle(null);
-      expect(listener).to.be.called();
+      expect(listener.called).to.be(true);
     });
 
   });
@@ -417,6 +521,59 @@ describe('ol.source.Vector', function() {
 
   });
 
+  describe('#getFeatureByUid()', function() {
+    let source;
+    beforeEach(function() {
+      source = new VectorSource();
+    });
+
+    it('returns a feature with an id', function() {
+      const feature = new Feature();
+      feature.setId('abcd');
+      source.addFeature(feature);
+      expect(source.getFeatureByUid(getUid(feature))).to.be(feature);
+    });
+
+    it('returns a feature without id', function() {
+      const feature = new Feature();
+      source.addFeature(feature);
+      expect(source.getFeatureByUid(getUid(feature))).to.be(feature);
+    });
+
+    it('returns null when no feature is found', function() {
+      const feature = new Feature();
+      feature.setId('abcd');
+      source.addFeature(feature);
+      const wrongId = 'abcd';
+      expect(source.getFeatureByUid(wrongId)).to.be(null);
+    });
+
+    it('returns null after removing feature', function() {
+      const feature = new Feature();
+      feature.setId('abcd');
+      source.addFeature(feature);
+      const uid = getUid(feature);
+      expect(source.getFeatureByUid(uid)).to.be(feature);
+      source.removeFeature(feature);
+      expect(source.getFeatureByUid(uid)).to.be(null);
+    });
+
+    it('returns null after clear', function() {
+      const feature = new Feature();
+      feature.setId('abcd');
+      source.addFeature(feature);
+      const uid = getUid(feature);
+      expect(source.getFeatureByUid(uid)).to.be(feature);
+      source.clear();
+      expect(source.getFeatureByUid(uid)).to.be(null);
+    });
+
+    it('returns null when no features are present', function() {
+      expect(source.getFeatureByUid('abcd')).to.be(null);
+    });
+
+  });
+
   describe('#loadFeatures', function() {
 
     describe('with the "bbox" strategy', function() {
@@ -429,14 +586,15 @@ describe('ol.source.Vector', function() {
           loader: function(extent) {
             setTimeout(function() {
               const lonLatExtent = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
-              expect(lonLatExtent[0]).to.roughlyEqual(-99.261474609, 1e-9);
-              expect(lonLatExtent[2]).to.roughlyEqual(-95.965576171, 1e-9);
+              expect(lonLatExtent[0]).to.roughlyEqual(-99.259349218, 1e-9);
+              expect(lonLatExtent[2]).to.roughlyEqual(-95.963450781, 1e-9);
               done();
             }, 0);
           }
         });
         const div = document.createElement('div');
-        div.style.width = div.style.height = '100px';
+        div.style.width = '100px';
+        div.style.height = '100px';
         document.body.appendChild(div);
         const map = new Map({
           target: div,
@@ -485,7 +643,7 @@ describe('ol.source.Vector', function() {
         source.loadFeatures([-10000, -10000, 10000, 10000], 1,
           getProjection('EPSG:3857'));
         source.setLoader(loader2);
-        source.clear();
+        source.refresh();
         source.loadFeatures([-10000, -10000, 10000, 10000], 1,
           getProjection('EPSG:3857'));
         expect(count1).to.eql(1);
@@ -617,6 +775,19 @@ describe('ol.source.Vector', function() {
       expect(source.getFeatures().length).to.be(0);
     });
 
+    it('prevents adding two features with a duplicate id in the collection', function() {
+      source = new VectorSource({
+        features: new Collection()
+      });
+      const feature1 = new Feature();
+      feature1.setId('1');
+      const feature2 = new Feature();
+      feature2.setId('1');
+      const collection = source.getFeaturesCollection();
+      collection.push(feature1);
+      collection.push(feature2);
+      expect(collection.getLength()).to.be(1);
+    });
   });
 
   describe('with a collection of features plus spatial index', function() {

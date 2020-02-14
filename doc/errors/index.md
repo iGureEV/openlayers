@@ -43,7 +43,7 @@ Unknown `serverType` configured.
 
 ### 10
 
-The default `geometryFunction` can only handle `ol.geom.Point` geometries.
+The default `geometryFunction` can only handle `ol/geom/Point` geometries.
 
 ### 11
 
@@ -139,7 +139,7 @@ Invalid geometry layout. Must be `XY`, `XYZ`, `XYM` or `XYZM`.
 
 ### 36
 
-Unknown SRS type. Expected `"name"` or `"EPSG"`.
+Unknown SRS type. Expected `"name"`.
 
 ### 37
 
@@ -220,3 +220,32 @@ Duplicate item added to a unique collection.  For example, it may be that you tr
 ### 59
 
 Invalid command found in the PBF.  This indicates that the loaded vector tile may be corrupt.
+
+### 60
+
+Missing or invalid `size`.
+
+### 61
+
+Cannot determine IIIF Image API version from provided image information JSON.
+
+### 62
+
+A `WebGLArrayBuffer` must either be of type `ELEMENT_ARRAY_BUFFER` or `ARRAY_BUFFER`.
+
+### 63
+
+Support for the `OES_element_index_uint` WebGL extension is mandatory for WebGL layers.
+
+### 64
+
+Layer opacity must be a number.
+
+### 66
+
+`forEachFeatureAtCoordinate` cannot be used on a WebGL layer if the hit detection logic has not been enabled.
+This is done by providing adequate shaders using the `hitVertexShader` and `hitFragmentShader` properties of `WebGLPointsLayerRenderer`.
+
+### 67
+
+A layer can only be added to the map once. Use either `layer.setMap()` or `map.addLayer()`, not both.

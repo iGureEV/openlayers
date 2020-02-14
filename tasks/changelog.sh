@@ -44,7 +44,7 @@ main() {
   git log --first-parent --format='%aN|%s %b' ${1} |
   {
     while read l; do
-      output="`[[ ${l} =~ "openlayers/greenkeeper" ]] && echo greenkeeper || echo main`_output"
+      output="`[[ ${l} =~ "openlayers/dependabot" ]] && echo dependabot || echo main`_output"
       if [[ ${l} =~ ${MERGE_RE} ]] ; then
         number="${BASH_REMATCH[1]}"
         author="${BASH_REMATCH[2]}"
@@ -60,10 +60,14 @@ main() {
 
     echo -e "$main_output"
 
-    if [ -n "$greenkeeper_output" ]; then
+    if [ -n "$dependabot_output" ]; then
       echo
-      echo "Additionally a number of updates where made to our dependencies:"
-      echo -e "$greenkeeper_output"
+      echo "<details>"
+      echo "  <summary>Dependency Updates</summary>"
+      echo
+      echo -e "$dependabot_output"
+      echo
+      echo "</details>"
     fi
   }
 }

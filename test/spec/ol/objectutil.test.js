@@ -30,15 +30,11 @@ describe('ol.obj.assign()', function() {
   });
 
   it('throws a TypeError with `undefined` as target', function() {
-    expect(assign).withArgs(undefined).to.throwException(function(e) {
-      expect(e).to.be.a(TypeError);
-    });
+    expect(() => assign()).to.throwException(/Cannot convert undefined or null to object/);
   });
 
   it('throws a TypeError with `null` as target', function() {
-    expect(assign).withArgs(null).to.throwException(function(e) {
-      expect(e).to.be.a(TypeError);
-    });
+    expect(() => assign(null)).to.throwException(/Cannot convert undefined or null to object/);
   });
 
 });
@@ -58,7 +54,7 @@ describe('ol.obj.getValues()', function() {
 
   it('gets a list of property values from an object', function() {
     expect(getValues({foo: 'bar', num: 42}).sort()).to.eql([42, 'bar']);
-    expect(getValues(null)).to.eql([]);
+    expect(getValues([])).to.eql([]);
   });
 
 });

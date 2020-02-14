@@ -1,15 +1,9 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
 import GeoJSON from '../src/ol/format/GeoJSON.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import VectorLayer from '../src/ol/layer/Vector.js';
-import OSM from '../src/ol/source/OSM.js';
-import VectorSource from '../src/ol/source/Vector.js';
-import CircleStyle from '../src/ol/style/Circle.js';
-import Fill from '../src/ol/style/Fill.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
-import Text from '../src/ol/style/Text.js';
+import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
+import {OSM, Vector as VectorSource} from '../src/ol/source.js';
+import {Circle as CircleStyle, Fill, Stroke, Style, Text} from '../src/ol/style.js';
 
 let openSansAdded = false;
 
@@ -22,6 +16,7 @@ const myDom = {
     font: document.getElementById('points-font'),
     weight: document.getElementById('points-weight'),
     size: document.getElementById('points-size'),
+    height: document.getElementById('points-height'),
     offsetX: document.getElementById('points-offset-x'),
     offsetY: document.getElementById('points-offset-y'),
     color: document.getElementById('points-color'),
@@ -40,6 +35,7 @@ const myDom = {
     maxangle: document.getElementById('lines-maxangle'),
     overflow: document.getElementById('lines-overflow'),
     size: document.getElementById('lines-size'),
+    height: document.getElementById('lines-height'),
     offsetX: document.getElementById('lines-offset-x'),
     offsetY: document.getElementById('lines-offset-y'),
     color: document.getElementById('lines-color'),
@@ -58,6 +54,7 @@ const myDom = {
     maxangle: document.getElementById('polygons-maxangle'),
     overflow: document.getElementById('polygons-overflow'),
     size: document.getElementById('polygons-size'),
+    height: document.getElementById('polygons-height'),
     offsetX: document.getElementById('polygons-offset-x'),
     offsetY: document.getElementById('polygons-offset-y'),
     color: document.getElementById('polygons-color'),
@@ -78,7 +75,7 @@ const getText = function(feature, resolution, dom) {
     text = '';
   } else if (type == 'shorten') {
     text = text.trunc(12);
-  } else if (type == 'wrap' && dom.placement.value != 'line') {
+  } else if (type == 'wrap' && (!dom.placement || dom.placement.value != 'line')) {
     text = stringDivider(text, 16, '\n');
   }
 
@@ -90,6 +87,7 @@ const createTextStyle = function(feature, resolution, dom) {
   const align = dom.align.value;
   const baseline = dom.baseline.value;
   const size = dom.size.value;
+  const height = dom.height.value;
   const offsetX = parseInt(dom.offsetX.value, 10);
   const offsetY = parseInt(dom.offsetY.value, 10);
   const weight = dom.weight.value;
@@ -104,7 +102,7 @@ const createTextStyle = function(feature, resolution, dom) {
     document.getElementsByTagName('head')[0].appendChild(openSans);
     openSansAdded = true;
   }
-  const font = weight + ' ' + size + ' ' + dom.font.value;
+  const font = weight + ' ' + size + '/' + height + ' ' + dom.font.value;
   const fillColor = dom.color.value;
   const outlineColor = dom.outline.value;
   const outlineWidth = parseInt(dom.outlineWidth.value, 10);

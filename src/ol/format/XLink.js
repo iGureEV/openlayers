@@ -1,7 +1,6 @@
 /**
  * @module ol/format/XLink
  */
-const XLink = {};
 
 
 /**
@@ -12,10 +11,9 @@ const NAMESPACE_URI = 'http://www.w3.org/1999/xlink';
 
 
 /**
- * @param {Node} node Node.
- * @return {boolean|undefined} Boolean.
+ * @param {Element} node Node.
+ * @return {string|undefined} href.
  */
-XLink.readHref = function(node) {
+export function readHref(node) {
   return node.getAttributeNS(NAMESPACE_URI, 'href');
-};
-export default XLink;
+}

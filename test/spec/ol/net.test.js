@@ -1,4 +1,4 @@
-import {getUid} from '../../../src/ol/index.js';
+import {getUid} from '../../../src/ol/util.js';
 import {jsonp as requestJSONP} from '../../../src/ol/net.js';
 
 describe('ol.net', function() {
@@ -67,7 +67,7 @@ describe('ol.net', function() {
         };
       };
       function callback() {
-        expect.fail();
+        expect().fail();
       }
       function errback() {
         expect(window[key]).to.be(undefined);

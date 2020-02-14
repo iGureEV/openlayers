@@ -1,13 +1,13 @@
-import * as _ol_extent_ from '../../../../src/ol/extent.js';
+import {isEmpty} from '../../../../src/ol/extent.js';
 import LineString from '../../../../src/ol/geom/LineString.js';
 
 
 describe('ol.geom.LineString', function() {
 
-  it('can be constructed with a null geometry', function() {
+  it('cannot be constructed with a null geometry', function() {
     expect(function() {
       return new LineString(null);
-    }).not.to.throwException();
+    }).to.throwException();
   });
 
   describe('construct empty', function() {
@@ -26,7 +26,7 @@ describe('ol.geom.LineString', function() {
     });
 
     it('has an empty extent', function() {
-      expect(_ol_extent_.isEmpty(lineString.getExtent())).to.be(true);
+      expect(isEmpty(lineString.getExtent())).to.be(true);
     });
 
     it('has empty flat coordinates', function() {
@@ -73,6 +73,12 @@ describe('ol.geom.LineString', function() {
       expect(lineString.getStride()).to.be(2);
     });
 
+    describe('#intersectsCoordinate', function() {
+      it('returns true for an intersecting coordinate', function() {
+        expect(lineString.intersectsCoordinate([1.5, 2.5])).to.be(true);
+      });
+    });
+
     describe('#intersectsExtent', function() {
 
       it('return false for non matching extent', function() {
@@ -85,6 +91,23 @@ describe('ol.geom.LineString', function() {
 
       it('returns true for the geom\'s own extent', function() {
         expect(lineString.intersectsExtent(lineString.getExtent())).to.be(true);
+      });
+
+    });
+
+    describe('#intersectsCoordinate', function() {
+
+      it('detects intersecting coordinates', function() {
+        expect(lineString.intersectsCoordinate([1, 2])).to.be(true);
+      });
+
+    });
+
+    describe('#getClosestPoint', function() {
+
+      it('uses existing vertices', function() {
+        const closestPoint = lineString.getClosestPoint([0.9, 1.8]);
+        expect(closestPoint).to.eql([1, 2]);
       });
 
     });
@@ -336,19 +359,6 @@ describe('ol.geom.LineString', function() {
           [[0, 0], [3, 3], [5, 1], [7, 5]]);
       });
 
-      it('caches by resolution', function() {
-        const simplifiedGeometry1 = lineString.getSimplifiedGeometry(1);
-        const simplifiedGeometry2 = lineString.getSimplifiedGeometry(1);
-        expect(simplifiedGeometry1).to.be(simplifiedGeometry2);
-      });
-
-      it('invalidates the cache when the geometry changes', function() {
-        const simplifiedGeometry1 = lineString.getSimplifiedGeometry(1);
-        lineString.setCoordinates(lineString.getCoordinates());
-        const simplifiedGeometry2 = lineString.getSimplifiedGeometry(1);
-        expect(simplifiedGeometry1).not.to.be(simplifiedGeometry2);
-      });
-
       it('remembers the minimum squared tolerance', function() {
         sinon.spy(lineString, 'getSimplifiedGeometryInternal');
         const simplifiedGeometry1 = lineString.getSimplifiedGeometry(0.05);
@@ -439,6 +449,39 @@ describe('ol.geom.LineString', function() {
         }
       });
 
+    });
+
+  });
+
+  describe('#containsXY()', function() {
+
+    let lineString;
+    beforeEach(function() {
+      lineString = new LineString([
+        [0, 0, 0, 0],
+        [1, -1, 2, 1],
+        [2, -2, 4, 2],
+        [4, -4, 8, 4],
+        [8, -8, 16, 8],
+        [12, -12, 24, 12],
+        [14, -14, 28, 14],
+        [15, -15, 30, 15],
+        [16, -16, 32, 16],
+        [18, -18, 36, 18],
+        [22, -22, 44, 22]
+      ]);
+    });
+
+    it('does contain XY', function() {
+      expect(lineString.containsXY(1, -1)).to.be(true);
+      expect(lineString.containsXY(16, -16)).to.be(true);
+      expect(lineString.containsXY(3, -3)).to.be(true);
+    });
+
+    it('does not contain XY', function() {
+      expect(lineString.containsXY(1, 3)).to.be(false);
+      expect(lineString.containsXY(2, 2)).to.be(false);
+      expect(lineString.containsXY(2, 3)).to.be(false);
     });
 
   });

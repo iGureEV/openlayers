@@ -1,37 +1,28 @@
 import Feature from '../src/ol/Feature.js';
 import Map from '../src/ol/Map.js';
-import Observable from '../src/ol/Observable.js';
+import {unByKey} from '../src/ol/Observable.js';
 import View from '../src/ol/View.js';
-import {defaults as defaultControls} from '../src/ol/control.js';
 import {easeOut} from '../src/ol/easing.js';
 import Point from '../src/ol/geom/Point.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import VectorLayer from '../src/ol/layer/Vector.js';
+import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
 import {fromLonLat} from '../src/ol/proj.js';
-import OSM from '../src/ol/source/OSM.js';
-import VectorSource from '../src/ol/source/Vector.js';
-import CircleStyle from '../src/ol/style/Circle.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
+import {OSM, Vector as VectorSource} from '../src/ol/source.js';
+import {Circle as CircleStyle, Stroke, Style} from '../src/ol/style.js';
+import {getVectorContext} from '../src/ol/render.js';
 
+const tileLayer = new TileLayer({
+  source: new OSM({
+    wrapX: false
+  })
+});
 
 const map = new Map({
-  layers: [
-    new TileLayer({
-      source: new OSM({
-        wrapX: false
-      })
-    })
-  ],
-  controls: defaultControls({
-    attributionOptions: {
-      collapsible: false
-    }
-  }),
+  layers: [tileLayer],
   target: 'map',
   view: new View({
     center: [0, 0],
-    zoom: 1
+    zoom: 1,
+    multiWorld: true
   })
 });
 
@@ -54,10 +45,10 @@ function addRandomFeature() {
 const duration = 3000;
 function flash(feature) {
   const start = new Date().getTime();
-  const listenerKey = map.on('postcompose', animate);
+  const listenerKey = tileLayer.on('postrender', animate);
 
   function animate(event) {
-    const vectorContext = event.vectorContext;
+    const vectorContext = getVectorContext(event);
     const frameState = event.frameState;
     const flashGeom = feature.getGeometry().clone();
     const elapsed = frameState.time - start;
@@ -69,7 +60,6 @@ function flash(feature) {
     const style = new Style({
       image: new CircleStyle({
         radius: radius,
-        snapToPixel: false,
         stroke: new Stroke({
           color: 'rgba(255, 0, 0, ' + opacity + ')',
           width: 0.25 + opacity
@@ -80,10 +70,10 @@ function flash(feature) {
     vectorContext.setStyle(style);
     vectorContext.drawGeometry(flashGeom);
     if (elapsed > duration) {
-      Observable.unByKey(listenerKey);
+      unByKey(listenerKey);
       return;
     }
-    // tell OpenLayers to continue postcompose animation
+    // tell OpenLayers to continue postrender animation
     map.render();
   }
 }

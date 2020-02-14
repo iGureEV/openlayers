@@ -4,10 +4,9 @@ import Map from '../../../../src/ol/Map.js';
 import MapBrowserPointerEvent from '../../../../src/ol/MapBrowserPointerEvent.js';
 import View from '../../../../src/ol/View.js';
 import Point from '../../../../src/ol/geom/Point.js';
-import Translate from '../../../../src/ol/interaction/Translate.js';
+import Translate, {TranslateEvent} from '../../../../src/ol/interaction/Translate.js';
 import Interaction from '../../../../src/ol/interaction/Interaction.js';
 import VectorLayer from '../../../../src/ol/layer/Vector.js';
-import PointerEvent from '../../../../src/ol/pointer/PointerEvent.js';
 import VectorSource from '../../../../src/ol/source/Vector.js';
 
 
@@ -66,12 +65,15 @@ describe('ol.interaction.Translate', function() {
     // calculated in case body has top < 0 (test runner with small window)
     const position = viewport.getBoundingClientRect();
     const shiftKey = opt_shiftKey !== undefined ? opt_shiftKey : false;
-    const event = new MapBrowserPointerEvent(type, map,
-      new PointerEvent(type, {
-        clientX: position.left + x + width / 2,
-        clientY: position.top + y + height / 2,
-        shiftKey: shiftKey
-      }));
+    const event = new MapBrowserPointerEvent(type, map, {
+      type: type,
+      target: viewport.firstChild,
+      pointerId: 0,
+      clientX: position.left + x + width / 2,
+      clientY: position.top + y + height / 2,
+      shiftKey: shiftKey,
+      preventDefault: function() {}
+    });
     map.handleMapBrowserEvent(event);
   }
 
@@ -80,7 +82,7 @@ describe('ol.interaction.Translate', function() {
    * modifications. Helper function to
    * @param {ol.Feature} feature Translated feature.
    * @param {ol.interaction.Translate} interaction The interaction.
-   * @return {Array<ol.interaction.Translate.Event|string>} events
+   * @return {Array<TranslateEvent|string>} events
    */
   function trackEvents(feature, interaction) {
     const events = [];
@@ -100,7 +102,7 @@ describe('ol.interaction.Translate', function() {
    * Validates the event array to verify proper event sequence. Checks
    * that first and last event are correct TranslateEvents and that feature
    * modifications event are in between.
-   * @param {Array<ol.interaction.Translate.Event|string>} events The events.
+   * @param {Array<TranslateEvent|string>} events The events.
    * @param {Array<ol.Feature>} features The features.
    */
   function validateEvents(events, features) {
@@ -109,11 +111,11 @@ describe('ol.interaction.Translate', function() {
     const endevent = events[events.length - 1];
 
     // first event should be translatestart
-    expect(startevent).to.be.an(Translate.Event);
+    expect(startevent).to.be.an(TranslateEvent);
     expect(startevent.type).to.eql('translatestart');
 
     // last event should be translateend
-    expect(endevent).to.be.an(Translate.Event);
+    expect(endevent).to.be.an(TranslateEvent);
     expect(endevent.type).to.eql('translateend');
 
     // make sure we get change events to events array
@@ -212,6 +214,47 @@ describe('ol.interaction.Translate', function() {
       expect(features[1].getGeometry().getCoordinates()).to.eql([20, -30]);
 
       validateEvents(events, [features[0]]);
+    });
+  });
+
+  describe('moving features, with filter option', function() {
+    let translate;
+
+    beforeEach(function() {
+      translate = new Translate({
+        filter: function(feature, layer) {
+          return feature == features[0];
+        }
+      });
+      map.addInteraction(translate);
+    });
+
+    it('moves a filter-passing feature', function() {
+      const events = trackEvents(features[0], translate);
+
+      simulateEvent('pointermove', 10, 20);
+      simulateEvent('pointerdown', 10, 20);
+      simulateEvent('pointerdrag', 50, -40);
+      simulateEvent('pointerup', 50, -40);
+      const geometry = features[0].getGeometry();
+      expect(geometry).to.be.a(Point);
+      expect(geometry.getCoordinates()).to.eql([50, 40]);
+
+      validateEvents(events, [features[0]]);
+    });
+
+    it('does not move a filter-discarded feature', function() {
+      const events = trackEvents(features[0], translate);
+
+      simulateEvent('pointermove', 20, 30);
+      simulateEvent('pointerdown', 20, 30);
+      simulateEvent('pointerdrag', 50, -40);
+      simulateEvent('pointerup', 50, -40);
+      const geometry = features[1].getGeometry();
+      expect(geometry).to.be.a(Point);
+      expect(geometry.getCoordinates()).to.eql([20, -30]);
+
+      expect(events).to.be.empty();
     });
   });
 

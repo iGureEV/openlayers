@@ -1,67 +1,81 @@
 /**
  * @module ol/format/OWS
  */
-import {inherits} from '../index.js';
-import XLink from '../format/XLink.js';
-import XML from '../format/XML.js';
-import XSD from '../format/XSD.js';
+import {readHref} from './XLink.js';
+import XML from './XML.js';
+import {readString} from './xsd.js';
 import {makeObjectPropertyPusher, makeObjectPropertySetter, makeStructureNS, pushParseAndPop} from '../xml.js';
-
-/**
- * @constructor
- * @extends {ol.format.XML}
- */
-const OWS = function() {
-  XML.call(this);
-};
-
-inherits(OWS, XML);
 
 
 /**
  * @const
- * @type {Array.<string>}
+ * @type {Array<null|string>}
  */
 const NAMESPACE_URIS = [null, 'http://www.opengis.net/ows/1.1'];
 
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
-    'ServiceIdentification': makeObjectPropertySetter(
-      readServiceIdentification),
-    'ServiceProvider': makeObjectPropertySetter(
-      readServiceProvider),
-    'OperationsMetadata': makeObjectPropertySetter(
-      readOperationsMetadata)
+    'ServiceIdentification': makeObjectPropertySetter(readServiceIdentification),
+    'ServiceProvider': makeObjectPropertySetter(readServiceProvider),
+    'OperationsMetadata': makeObjectPropertySetter(readOperationsMetadata)
   });
+
+
+class OWS extends XML {
+  constructor() {
+    super();
+  }
+
+  /**
+   * @inheritDoc
+   */
+  readFromDocument(doc) {
+    for (let n = doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        return this.readFromNode(n);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * @inheritDoc
+   */
+  readFromNode(node) {
+    const owsObject = pushParseAndPop({},
+      PARSERS, node, []);
+    return owsObject ? owsObject : null;
+  }
+}
 
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const ADDRESS_PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
-    'DeliveryPoint': makeObjectPropertySetter(
-      XSD.readString),
-    'City': makeObjectPropertySetter(XSD.readString),
-    'AdministrativeArea': makeObjectPropertySetter(
-      XSD.readString),
-    'PostalCode': makeObjectPropertySetter(XSD.readString),
-    'Country': makeObjectPropertySetter(XSD.readString),
-    'ElectronicMailAddress': makeObjectPropertySetter(
-      XSD.readString)
+    'DeliveryPoint': makeObjectPropertySetter(readString),
+    'City': makeObjectPropertySetter(readString),
+    'AdministrativeArea': makeObjectPropertySetter(readString),
+    'PostalCode': makeObjectPropertySetter(readString),
+    'Country': makeObjectPropertySetter(readString),
+    'ElectronicMailAddress': makeObjectPropertySetter(readString)
   });
 
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const ALLOWED_VALUES_PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
     'Value': makeObjectPropertyPusher(readValue)
@@ -70,19 +84,20 @@ const ALLOWED_VALUES_PARSERS = makeStructureNS(
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const CONSTRAINT_PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
-    'AllowedValues': makeObjectPropertySetter(
-      readAllowedValues)
+    'AllowedValues': makeObjectPropertySetter(readAllowedValues)
   });
 
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const CONTACT_INFO_PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
     'Phone': makeObjectPropertySetter(readPhone),
@@ -92,8 +107,9 @@ const CONTACT_INFO_PARSERS = makeStructureNS(
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const DCP_PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
     'HTTP': makeObjectPropertySetter(readHttp)
@@ -102,8 +118,9 @@ const DCP_PARSERS = makeStructureNS(
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const HTTP_PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
     'Get': makeObjectPropertyPusher(readGet),
@@ -113,8 +130,9 @@ const HTTP_PARSERS = makeStructureNS(
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const OPERATION_PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
     'DCP': makeObjectPropertySetter(readDcp)
@@ -123,8 +141,9 @@ const OPERATION_PARSERS = makeStructureNS(
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const OPERATIONS_METADATA_PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
     'Operation': readOperation
@@ -133,98 +152,75 @@ const OPERATIONS_METADATA_PARSERS = makeStructureNS(
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const PHONE_PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
-    'Voice': makeObjectPropertySetter(XSD.readString),
-    'Facsimile': makeObjectPropertySetter(XSD.readString)
+    'Voice': makeObjectPropertySetter(readString),
+    'Facsimile': makeObjectPropertySetter(readString)
   });
 
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const REQUEST_METHOD_PARSERS = makeStructureNS(
   NAMESPACE_URIS, {
-    'Constraint': makeObjectPropertyPusher(
-      readConstraint)
+    'Constraint': makeObjectPropertyPusher(readConstraint)
   });
 
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const SERVICE_CONTACT_PARSERS =
     makeStructureNS(
       NAMESPACE_URIS, {
-        'IndividualName': makeObjectPropertySetter(
-          XSD.readString),
-        'PositionName': makeObjectPropertySetter(XSD.readString),
-        'ContactInfo': makeObjectPropertySetter(
-          readContactInfo)
+        'IndividualName': makeObjectPropertySetter(readString),
+        'PositionName': makeObjectPropertySetter(readString),
+        'ContactInfo': makeObjectPropertySetter(readContactInfo)
       });
 
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const SERVICE_IDENTIFICATION_PARSERS =
     makeStructureNS(
       NAMESPACE_URIS, {
-        'Abstract': makeObjectPropertySetter(XSD.readString),
-        'AccessConstraints': makeObjectPropertySetter(XSD.readString),
-        'Fees': makeObjectPropertySetter(XSD.readString),
-        'Title': makeObjectPropertySetter(XSD.readString),
-        'ServiceTypeVersion': makeObjectPropertySetter(
-          XSD.readString),
-        'ServiceType': makeObjectPropertySetter(XSD.readString)
+        'Abstract': makeObjectPropertySetter(readString),
+        'AccessConstraints': makeObjectPropertySetter(readString),
+        'Fees': makeObjectPropertySetter(readString),
+        'Title': makeObjectPropertySetter(readString),
+        'ServiceTypeVersion': makeObjectPropertySetter(readString),
+        'ServiceType': makeObjectPropertySetter(readString)
       });
 
 
 /**
  * @const
- * @type {Object.<string, Object.<string, ol.XmlParser>>}
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
  */
+// @ts-ignore
 const SERVICE_PROVIDER_PARSERS =
     makeStructureNS(
       NAMESPACE_URIS, {
-        'ProviderName': makeObjectPropertySetter(XSD.readString),
-        'ProviderSite': makeObjectPropertySetter(XLink.readHref),
-        'ServiceContact': makeObjectPropertySetter(
-          readServiceContact)
+        'ProviderName': makeObjectPropertySetter(readString),
+        'ProviderSite': makeObjectPropertySetter(readHref),
+        'ServiceContact': makeObjectPropertySetter(readServiceContact)
       });
 
 
 /**
- * @inheritDoc
- */
-OWS.prototype.readFromDocument = function(doc) {
-  for (let n = doc.firstChild; n; n = n.nextSibling) {
-    if (n.nodeType == Node.ELEMENT_NODE) {
-      return this.readFromNode(n);
-    }
-  }
-  return null;
-};
-
-
-/**
- * @inheritDoc
- */
-OWS.prototype.readFromNode = function(node) {
-  const owsObject = pushParseAndPop({},
-    PARSERS, node, []);
-  return owsObject ? owsObject : null;
-};
-
-
-/**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The address.
  */
 function readAddress(node, objectStack) {
@@ -234,8 +230,8 @@ function readAddress(node, objectStack) {
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The values.
  */
 function readAllowedValues(node, objectStack) {
@@ -245,8 +241,8 @@ function readAllowedValues(node, objectStack) {
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The constraint.
  */
 function readConstraint(node, objectStack) {
@@ -261,8 +257,8 @@ function readConstraint(node, objectStack) {
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The contact info.
  */
 function readContactInfo(node, objectStack) {
@@ -272,8 +268,8 @@ function readContactInfo(node, objectStack) {
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The DCP.
  */
 function readDcp(node, objectStack) {
@@ -283,12 +279,12 @@ function readDcp(node, objectStack) {
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The GET object.
  */
 function readGet(node, objectStack) {
-  const href = XLink.readHref(node);
+  const href = readHref(node);
   if (!href) {
     return undefined;
   }
@@ -298,19 +294,18 @@ function readGet(node, objectStack) {
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The HTTP object.
  */
 function readHttp(node, objectStack) {
-  return pushParseAndPop({}, HTTP_PARSERS,
-    node, objectStack);
+  return pushParseAndPop({}, HTTP_PARSERS, node, objectStack);
 }
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The operation.
  */
 function readOperation(node, objectStack) {
@@ -327,12 +322,11 @@ function readOperation(node, objectStack) {
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The operations metadata.
  */
-function readOperationsMetadata(node,
-  objectStack) {
+function readOperationsMetadata(node, objectStack) {
   return pushParseAndPop({},
     OPERATIONS_METADATA_PARSERS, node,
     objectStack);
@@ -340,8 +334,8 @@ function readOperationsMetadata(node,
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The phone.
  */
 function readPhone(node, objectStack) {
@@ -351,12 +345,11 @@ function readPhone(node, objectStack) {
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The service identification.
  */
-function readServiceIdentification(node,
-  objectStack) {
+function readServiceIdentification(node, objectStack) {
   return pushParseAndPop(
     {}, SERVICE_IDENTIFICATION_PARSERS, node,
     objectStack);
@@ -364,8 +357,8 @@ function readServiceIdentification(node,
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The service contact.
  */
 function readServiceContact(node, objectStack) {
@@ -376,8 +369,8 @@ function readServiceContact(node, objectStack) {
 
 
 /**
- * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
  * @return {Object|undefined} The service provider.
  */
 function readServiceProvider(node, objectStack) {
@@ -389,11 +382,11 @@ function readServiceProvider(node, objectStack) {
 
 /**
  * @param {Node} node Node.
- * @param {Array.<*>} objectStack Object stack.
+ * @param {Array<*>} objectStack Object stack.
  * @return {string|undefined} The value.
  */
 function readValue(node, objectStack) {
-  return XSD.readString(node);
+  return readString(node);
 }
 
 

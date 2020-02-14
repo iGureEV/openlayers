@@ -1,4 +1,4 @@
-import Event from '../../../../src/ol/events/Event.js';
+import Event, {preventDefault, stopPropagation} from '../../../../src/ol/events/Event.js';
 
 describe('ol.events.Event', function() {
 
@@ -19,9 +19,9 @@ describe('ol.events.Event', function() {
       event.preventDefault();
       expect(event.propagationStopped).to.be(true);
     });
-    it('is the same as #stopPropagation', function() {
+    it('does the same as #stopPropagation', function() {
       const event = new Event('foo');
-      expect(event.stopPropagation).to.equal(event.preventDefault);
+      expect(event.stopPropagation()).to.equal(event.preventDefault());
     });
   });
 
@@ -30,7 +30,7 @@ describe('ol.events.Event', function() {
       const event = {
         preventDefault: sinon.spy()
       };
-      Event.preventDefault(event);
+      preventDefault(event);
       expect(event.preventDefault.called).to.be(true);
     });
   });
@@ -40,7 +40,7 @@ describe('ol.events.Event', function() {
       const event = {
         stopPropagation: sinon.spy()
       };
-      Event.stopPropagation(event);
+      stopPropagation(event);
       expect(event.stopPropagation.called).to.be(true);
     });
   });

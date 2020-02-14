@@ -1,5 +1,3 @@
-import {equals} from '../src/ol/array.js';
-import {WEBGL} from '../src/ol/has.js';
 // avoid importing anything that results in an instanceof check
 // since these extensions are global, instanceof checks fail with modules
 
@@ -84,23 +82,6 @@ import {WEBGL} from '../src/ol/has.js';
       function() {
         return 'expected ' + expect.stringify(this.obj) +
               ' not to be within ' + tol + ' of ' + n;
-      });
-    return this;
-  };
-
-
-  /**
-   * Assert that a sinon spy was called.
-   * @return {expect.Assertion} The assertion.
-   */
-  expect.Assertion.prototype.called = function() {
-    this.assert(
-      this.obj.called,
-      function() {
-        return 'expected ' + expect.stringify(this.obj) + ' to be called';
-      },
-      function() {
-        return 'expected ' + expect.stringify(this.obj) + ' not to be called';
       });
     return this;
   };
@@ -310,50 +291,6 @@ import {WEBGL} from '../src/ol/has.js';
   };
 
 
-  /**
-   * Checks if the array sort of equals another array.
-   * @param {Object} obj The other object.
-   * @return {expect.Assertion} The assertion.
-   */
-  expect.Assertion.prototype.arreql = function(obj) {
-    this.assert(
-      equals(this.obj, obj),
-      function() {
-        return 'expected ' + expect.stringify(this.obj) +
-              ' to sort of equal ' + expect.stringify(obj);
-      },
-      function() {
-        return 'expected ' + expect.stringify(this.obj) +
-              ' to sort of not equal ' + expect.stringify(obj);
-      });
-    return this;
-  };
-
-
-  /**
-   * Checks if the array sort of equals another array (allows NaNs to be equal).
-   * @param {Object} obj The other object.
-   * @return {expect.Assertion} The assertion.
-   */
-  expect.Assertion.prototype.arreqlNaN = function(obj) {
-    function compare(a, i) {
-      const b = obj[i];
-      return a === b || (typeof a === 'number' && typeof b === 'number' &&
-          isNaN(a) && isNaN(b));
-    }
-    this.assert(
-      this.obj.length === obj.length && this.obj.every(compare),
-      function() {
-        return 'expected ' + expect.stringify(this.obj) +
-              ' to sort of equal ' + expect.stringify(obj);
-      },
-      function() {
-        return 'expected ' + expect.stringify(this.obj) +
-              ' to sort of not equal ' + expect.stringify(obj);
-      });
-    return this;
-  };
-
   global.createMapDiv = function(width, height) {
     const target = document.createElement('div');
     const style = target.style;
@@ -376,12 +313,6 @@ import {WEBGL} from '../src/ol/has.js';
     map.dispose();
   };
 
-  global.assertWebGL = function(map) {
-    if (!WEBGL) {
-      expect().fail('No WebGL support!');
-    }
-  };
-
   function resembleCanvas(canvas, referenceImage, tolerance, done) {
     if (showMap) {
       const wrapper = document.createElement('div');
@@ -397,7 +328,7 @@ import {WEBGL} from '../src/ol/has.js';
     image.addEventListener('load', function() {
       expect(image.width).to.be(width);
       expect(image.height).to.be(height);
-      const referenceCanvas = document.createElement('CANVAS');
+      const referenceCanvas = document.createElement('canvas');
       referenceCanvas.width = image.width;
       referenceCanvas.height = image.height;
       const referenceContext = referenceCanvas.getContext('2d');
@@ -443,21 +374,7 @@ import {WEBGL} from '../src/ol/has.js';
         return;
       }
 
-      let canvas;
-      if (event.glContext) {
-        const webglCanvas = event.glContext.getCanvas();
-        expect(webglCanvas).to.be.a(HTMLCanvasElement);
-
-        // draw the WebGL canvas on a new canvas, because we can not create
-        // a 2d context for that canvas because there is already a webgl context.
-        canvas = document.createElement('canvas');
-        canvas.width = webglCanvas.width;
-        canvas.height = webglCanvas.height;
-        canvas.getContext('2d').drawImage(webglCanvas, 0, 0,
-          webglCanvas.width, webglCanvas.height);
-      } else {
-        canvas = event.context.canvas;
-      }
+      const canvas = event.context.canvas;
       expect(canvas).to.be.a(HTMLCanvasElement);
 
       resembleCanvas(canvas, referenceImage, tolerance, done);

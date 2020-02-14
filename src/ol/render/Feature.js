@@ -1,278 +1,284 @@
 /**
  * @module ol/render/Feature
  */
-import {nullFunction} from '../index.js';
 import {extend} from '../array.js';
 import {createOrUpdateFromCoordinate, createOrUpdateFromFlatCoordinates, getCenter, getHeight} from '../extent.js';
 import GeometryType from '../geom/GeometryType.js';
 import {linearRingss as linearRingssCenter} from '../geom/flat/center.js';
-import _ol_geom_flat_interiorpoint_ from '../geom/flat/interiorpoint.js';
-import _ol_geom_flat_interpolate_ from '../geom/flat/interpolate.js';
-import _ol_geom_flat_transform_ from '../geom/flat/transform.js';
-import _ol_transform_ from '../transform.js';
+import {getInteriorPointOfArray, getInteriorPointsOfMultiArray} from '../geom/flat/interiorpoint.js';
+import {interpolatePoint} from '../geom/flat/interpolate.js';
+import {get as getProjection} from '../proj.js';
+import {transform2D} from '../geom/flat/transform.js';
+import {create as createTransform, compose as composeTransform} from '../transform.js';
+
 
 /**
- * Lightweight, read-only, {@link ol.Feature} and {@link ol.geom.Geometry} like
+ * @type {import("../transform.js").Transform}
+ */
+const tmpTransform = createTransform();
+
+
+/**
+ * Lightweight, read-only, {@link module:ol/Feature~Feature} and {@link module:ol/geom/Geometry~Geometry} like
  * structure, optimized for vector tile rendering and styling. Geometry access
  * through the API is limited to getting the type and extent of the geometry.
- *
- * @constructor
- * @param {ol.geom.GeometryType} type Geometry type.
- * @param {Array.<number>} flatCoordinates Flat coordinates. These always need
- *     to be right-handed for polygons.
- * @param {Array.<number>|Array.<Array.<number>>} ends Ends or Endss.
- * @param {Object.<string, *>} properties Properties.
- * @param {number|string|undefined} id Feature id.
  */
-const RenderFeature = function(type, flatCoordinates, ends, properties, id) {
+class RenderFeature {
   /**
-   * @private
-   * @type {ol.Extent|undefined}
+   * @param {GeometryType} type Geometry type.
+   * @param {Array<number>} flatCoordinates Flat coordinates. These always need
+   *     to be right-handed for polygons.
+   * @param {Array<number>|Array<Array<number>>} ends Ends or Endss.
+   * @param {Object<string, *>} properties Properties.
+   * @param {number|string|undefined} id Feature id.
    */
-  this.extent_;
+  constructor(type, flatCoordinates, ends, properties, id) {
+    /**
+     * @private
+     * @type {import("../extent.js").Extent|undefined}
+     */
+    this.extent_;
+
+    /**
+     * @private
+     * @type {number|string|undefined}
+     */
+    this.id_ = id;
+
+    /**
+     * @private
+     * @type {GeometryType}
+     */
+    this.type_ = type;
+
+    /**
+     * @private
+     * @type {Array<number>}
+     */
+    this.flatCoordinates_ = flatCoordinates;
+
+    /**
+     * @private
+     * @type {Array<number>}
+     */
+    this.flatInteriorPoints_ = null;
+
+    /**
+     * @private
+     * @type {Array<number>}
+     */
+    this.flatMidpoints_ = null;
+
+    /**
+     * @private
+     * @type {Array<number>|Array<Array<number>>}
+     */
+    this.ends_ = ends;
+
+    /**
+     * @private
+     * @type {Object<string, *>}
+     */
+    this.properties_ = properties;
+
+  }
 
   /**
-   * @private
-   * @type {number|string|undefined}
+   * Get a feature property by its key.
+   * @param {string} key Key
+   * @return {*} Value for the requested key.
+   * @api
    */
-  this.id_ = id;
+  get(key) {
+    return this.properties_[key];
+  }
 
   /**
-   * @private
-   * @type {ol.geom.GeometryType}
+   * Get the extent of this feature's geometry.
+   * @return {import("../extent.js").Extent} Extent.
+   * @api
    */
-  this.type_ = type;
+  getExtent() {
+    if (!this.extent_) {
+      this.extent_ = this.type_ === GeometryType.POINT ?
+        createOrUpdateFromCoordinate(this.flatCoordinates_) :
+        createOrUpdateFromFlatCoordinates(
+          this.flatCoordinates_, 0, this.flatCoordinates_.length, 2);
+
+    }
+    return this.extent_;
+  }
 
   /**
-   * @private
-   * @type {Array.<number>}
+   * @return {Array<number>} Flat interior points.
    */
-  this.flatCoordinates_ = flatCoordinates;
+  getFlatInteriorPoint() {
+    if (!this.flatInteriorPoints_) {
+      const flatCenter = getCenter(this.getExtent());
+      this.flatInteriorPoints_ = getInteriorPointOfArray(
+        this.flatCoordinates_, 0, /** @type {Array<number>} */ (this.ends_), 2, flatCenter, 0);
+    }
+    return this.flatInteriorPoints_;
+  }
 
   /**
-   * @private
-   * @type {Array.<number>}
+   * @return {Array<number>} Flat interior points.
    */
-  this.flatInteriorPoints_ = null;
+  getFlatInteriorPoints() {
+    if (!this.flatInteriorPoints_) {
+      const flatCenters = linearRingssCenter(
+        this.flatCoordinates_, 0, /** @type {Array<Array<number>>} */ (this.ends_), 2);
+      this.flatInteriorPoints_ = getInteriorPointsOfMultiArray(
+        this.flatCoordinates_, 0, /** @type {Array<Array<number>>} */ (this.ends_), 2, flatCenters);
+    }
+    return this.flatInteriorPoints_;
+  }
 
   /**
-   * @private
-   * @type {Array.<number>}
+   * @return {Array<number>} Flat midpoint.
    */
-  this.flatMidpoints_ = null;
+  getFlatMidpoint() {
+    if (!this.flatMidpoints_) {
+      this.flatMidpoints_ = interpolatePoint(
+        this.flatCoordinates_, 0, this.flatCoordinates_.length, 2, 0.5);
+    }
+    return this.flatMidpoints_;
+  }
 
   /**
-   * @private
-   * @type {Array.<number>|Array.<Array.<number>>}
+   * @return {Array<number>} Flat midpoints.
    */
-  this.ends_ = ends;
+  getFlatMidpoints() {
+    if (!this.flatMidpoints_) {
+      this.flatMidpoints_ = [];
+      const flatCoordinates = this.flatCoordinates_;
+      let offset = 0;
+      const ends = /** @type {Array<number>} */ (this.ends_);
+      for (let i = 0, ii = ends.length; i < ii; ++i) {
+        const end = ends[i];
+        const midpoint = interpolatePoint(
+          flatCoordinates, offset, end, 2, 0.5);
+        extend(this.flatMidpoints_, midpoint);
+        offset = end;
+      }
+    }
+    return this.flatMidpoints_;
+  }
 
   /**
-   * @private
-   * @type {Object.<string, *>}
+   * Get the feature identifier.  This is a stable identifier for the feature and
+   * is set when reading data from a remote source.
+   * @return {number|string|undefined} Id.
+   * @api
    */
-  this.properties_ = properties;
-
+  getId() {
+    return this.id_;
+  }
 
   /**
-   * @private
-   * @type {ol.Transform}
+   * @return {Array<number>} Flat coordinates.
    */
-  this.tmpTransform_ = _ol_transform_.create();
-};
+  getOrientedFlatCoordinates() {
+    return this.flatCoordinates_;
+  }
+
+  /**
+   * For API compatibility with {@link module:ol/Feature~Feature}, this method is useful when
+   * determining the geometry type in style function (see {@link #getType}).
+   * @return {RenderFeature} Feature.
+   * @api
+   */
+  getGeometry() {
+    return this;
+  }
+
+  /**
+   * @param {number} squaredTolerance Squared tolerance.
+   * @return {RenderFeature} Simplified geometry.
+   */
+  getSimplifiedGeometry(squaredTolerance) {
+    return this;
+  }
+
+  /**
+   * Get a transformed and simplified version of the geometry.
+   * @abstract
+   * @param {number} squaredTolerance Squared tolerance.
+   * @param {import("../proj.js").TransformFunction} [opt_transform] Optional transform function.
+   * @return {RenderFeature} Simplified geometry.
+   */
+  simplifyTransformed(squaredTolerance, opt_transform) {
+    return this;
+  }
+
+  /**
+   * Get the feature properties.
+   * @return {Object<string, *>} Feature properties.
+   * @api
+   */
+  getProperties() {
+    return this.properties_;
+  }
+
+  /**
+   * @return {number} Stride.
+   */
+  getStride() {
+    return 2;
+  }
+
+  /**
+   * @return {undefined}
+   */
+  getStyleFunction() {
+    return undefined;
+  }
+
+  /**
+   * Get the type of this feature's geometry.
+   * @return {GeometryType} Geometry type.
+   * @api
+   */
+  getType() {
+    return this.type_;
+  }
+
+  /**
+   * Transform geometry coordinates from tile pixel space to projected.
+   * The SRS of the source and destination are expected to be the same.
+   *
+   * @param {import("../proj.js").ProjectionLike} source The current projection
+   * @param {import("../proj.js").ProjectionLike} destination The desired projection.
+   */
+  transform(source, destination) {
+    source = getProjection(source);
+    const pixelExtent = source.getExtent();
+    const projectedExtent = source.getWorldExtent();
+    const scale = getHeight(projectedExtent) / getHeight(pixelExtent);
+    composeTransform(tmpTransform,
+      projectedExtent[0], projectedExtent[3],
+      scale, -scale, 0,
+      0, 0);
+    transform2D(this.flatCoordinates_, 0, this.flatCoordinates_.length, 2,
+      tmpTransform, this.flatCoordinates_);
+  }
+}
 
 
 /**
- * Get a feature property by its key.
- * @param {string} key Key
- * @return {*} Value for the requested key.
- * @api
+ * @return {Array<number>|Array<Array<number>>} Ends or endss.
  */
-RenderFeature.prototype.get = function(key) {
-  return this.properties_[key];
-};
-
-
-/**
- * @return {Array.<number>|Array.<Array.<number>>} Ends or endss.
- */
-RenderFeature.prototype.getEnds =
-RenderFeature.prototype.getEndss = function() {
+RenderFeature.prototype.getEnds = function() {
   return this.ends_;
 };
+RenderFeature.prototype.getEndss = RenderFeature.prototype.getEnds;
 
 
 /**
- * Get the extent of this feature's geometry.
- * @return {ol.Extent} Extent.
- * @api
- */
-RenderFeature.prototype.getExtent = function() {
-  if (!this.extent_) {
-    this.extent_ = this.type_ === GeometryType.POINT ?
-      createOrUpdateFromCoordinate(this.flatCoordinates_) :
-      createOrUpdateFromFlatCoordinates(
-        this.flatCoordinates_, 0, this.flatCoordinates_.length, 2);
-
-  }
-  return this.extent_;
-};
-
-
-/**
- * @return {Array.<number>} Flat interior points.
- */
-RenderFeature.prototype.getFlatInteriorPoint = function() {
-  if (!this.flatInteriorPoints_) {
-    const flatCenter = getCenter(this.getExtent());
-    this.flatInteriorPoints_ = _ol_geom_flat_interiorpoint_.linearRings(
-      this.flatCoordinates_, 0, this.ends_, 2, flatCenter, 0);
-  }
-  return this.flatInteriorPoints_;
-};
-
-
-/**
- * @return {Array.<number>} Flat interior points.
- */
-RenderFeature.prototype.getFlatInteriorPoints = function() {
-  if (!this.flatInteriorPoints_) {
-    const flatCenters = linearRingssCenter(
-      this.flatCoordinates_, 0, this.ends_, 2);
-    this.flatInteriorPoints_ = _ol_geom_flat_interiorpoint_.linearRingss(
-      this.flatCoordinates_, 0, this.ends_, 2, flatCenters);
-  }
-  return this.flatInteriorPoints_;
-};
-
-
-/**
- * @return {Array.<number>} Flat midpoint.
- */
-RenderFeature.prototype.getFlatMidpoint = function() {
-  if (!this.flatMidpoints_) {
-    this.flatMidpoints_ = _ol_geom_flat_interpolate_.lineString(
-      this.flatCoordinates_, 0, this.flatCoordinates_.length, 2, 0.5);
-  }
-  return this.flatMidpoints_;
-};
-
-
-/**
- * @return {Array.<number>} Flat midpoints.
- */
-RenderFeature.prototype.getFlatMidpoints = function() {
-  if (!this.flatMidpoints_) {
-    this.flatMidpoints_ = [];
-    const flatCoordinates = this.flatCoordinates_;
-    let offset = 0;
-    const ends = this.ends_;
-    for (let i = 0, ii = ends.length; i < ii; ++i) {
-      const end = ends[i];
-      const midpoint = _ol_geom_flat_interpolate_.lineString(
-        flatCoordinates, offset, end, 2, 0.5);
-      extend(this.flatMidpoints_, midpoint);
-      offset = end;
-    }
-  }
-  return this.flatMidpoints_;
-};
-
-/**
- * Get the feature identifier.  This is a stable identifier for the feature and
- * is set when reading data from a remote source.
- * @return {number|string|undefined} Id.
- * @api
- */
-RenderFeature.prototype.getId = function() {
-  return this.id_;
-};
-
-
-/**
- * @return {Array.<number>} Flat coordinates.
- */
-RenderFeature.prototype.getOrientedFlatCoordinates = function() {
-  return this.flatCoordinates_;
-};
-
-
-/**
- * @return {Array.<number>} Flat coordinates.
+ * @return {Array<number>} Flat coordinates.
  */
 RenderFeature.prototype.getFlatCoordinates =
     RenderFeature.prototype.getOrientedFlatCoordinates;
 
 
-/**
- * For API compatibility with {@link ol.Feature}, this method is useful when
- * determining the geometry type in style function (see {@link #getType}).
- * @return {ol.render.Feature} Feature.
- * @api
- */
-RenderFeature.prototype.getGeometry = function() {
-  return this;
-};
-
-
-/**
- * Get the feature properties.
- * @return {Object.<string, *>} Feature properties.
- * @api
- */
-RenderFeature.prototype.getProperties = function() {
-  return this.properties_;
-};
-
-
-/**
- * Get the feature for working with its geometry.
- * @return {ol.render.Feature} Feature.
- */
-RenderFeature.prototype.getSimplifiedGeometry =
-    RenderFeature.prototype.getGeometry;
-
-
-/**
- * @return {number} Stride.
- */
-RenderFeature.prototype.getStride = function() {
-  return 2;
-};
-
-
-/**
- * @return {undefined}
- */
-RenderFeature.prototype.getStyleFunction = nullFunction;
-
-
-/**
- * Get the type of this feature's geometry.
- * @return {ol.geom.GeometryType} Geometry type.
- * @api
- */
-RenderFeature.prototype.getType = function() {
-  return this.type_;
-};
-
-/**
- * Transform geometry coordinates from tile pixel space to projected.
- * The SRS of the source and destination are expected to be the same.
- *
- * @param {ol.ProjectionLike} source The current projection
- * @param {ol.ProjectionLike} destination The desired projection.
- */
-RenderFeature.prototype.transform = function(source, destination) {
-  const pixelExtent = source.getExtent();
-  const projectedExtent = source.getWorldExtent();
-  const scale = getHeight(projectedExtent) / getHeight(pixelExtent);
-  const transform = this.tmpTransform_;
-  _ol_transform_.compose(transform,
-    projectedExtent[0], projectedExtent[3],
-    scale, -scale, 0,
-    0, 0);
-  _ol_geom_flat_transform_.transform2D(this.flatCoordinates_, 0, this.flatCoordinates_.length, 2,
-    transform, this.flatCoordinates_);
-};
 export default RenderFeature;

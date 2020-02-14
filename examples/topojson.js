@@ -1,18 +1,15 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
 import TopoJSON from '../src/ol/format/TopoJSON.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import VectorLayer from '../src/ol/layer/Vector.js';
+import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
 import TileJSON from '../src/ol/source/TileJSON.js';
 import VectorSource from '../src/ol/source/Vector.js';
-import Fill from '../src/ol/style/Fill.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
+import {Fill, Stroke, Style} from '../src/ol/style.js';
 
-
+const key = 'pk.eyJ1IjoidHNjaGF1YiIsImEiOiJjaW5zYW5lNHkxMTNmdWttM3JyOHZtMmNtIn0.CDIBD8H-G2Gf-cPkIuWtRg';
 const raster = new TileLayer({
   source: new TileJSON({
-    url: 'https://api.tiles.mapbox.com/v3/mapbox.world-dark.json?secure'
+    url: 'https://api.tiles.mapbox.com/v4/mapbox.world-dark.json?secure&access_token=' + key
   })
 });
 

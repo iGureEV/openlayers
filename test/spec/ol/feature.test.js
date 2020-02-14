@@ -1,4 +1,4 @@
-import Feature from '../../../src/ol/Feature.js';
+import Feature, {createStyleFunction} from '../../../src/ol/Feature.js';
 import Point from '../../../src/ol/geom/Point.js';
 import {isEmpty} from '../../../src/ol/obj.js';
 import Style from '../../../src/ol/style/Style.js';
@@ -102,7 +102,7 @@ describe('ol.Feature', function() {
 
     it('returns null for null geometry (constructor)', function() {
       const feature = new Feature(null);
-      expect(feature.getGeometry()).to.be(null);
+      expect(feature.getGeometry()).to.be(undefined);
     });
 
     it('returns null for null geometry (setGeometry())', function() {
@@ -208,7 +208,7 @@ describe('ol.Feature', function() {
       expect(feature.getGeometry()).to.be(point2);
 
       feature.on('change', function() {
-        expect.fail();
+        expect().fail();
       });
       point.setCoordinates([0, 2]);
     });
@@ -441,12 +441,12 @@ describe('ol.Feature.createStyleFunction()', function() {
   const style = new Style();
 
   it('creates a feature style function from a single style', function() {
-    const styleFunction = Feature.createStyleFunction(style);
+    const styleFunction = createStyleFunction(style);
     expect(styleFunction()).to.eql([style]);
   });
 
   it('creates a feature style function from an array of styles', function() {
-    const styleFunction = Feature.createStyleFunction([style]);
+    const styleFunction = createStyleFunction([style]);
     expect(styleFunction()).to.eql([style]);
   });
 
@@ -454,13 +454,13 @@ describe('ol.Feature.createStyleFunction()', function() {
     const original = function(feature, resolution) {
       return [style];
     };
-    const styleFunction = Feature.createStyleFunction(original);
+    const styleFunction = createStyleFunction(original);
     expect(styleFunction).to.be(original);
   });
 
   it('throws on (some) unexpected input', function() {
     expect(function() {
-      Feature.createStyleFunction({bogus: 'input'});
+      createStyleFunction({bogus: 'input'});
     }).to.throwException();
   });
 

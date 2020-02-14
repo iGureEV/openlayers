@@ -1,12 +1,11 @@
 /**
  * @module ol/format/EsriJSON
  */
-import {inherits} from '../index.js';
 import Feature from '../Feature.js';
 import {assert} from '../asserts.js';
 import {containsExtent} from '../extent.js';
-import {transformWithOptions} from '../format/Feature.js';
-import JSONFeature from '../format/JSONFeature.js';
+import {transformGeometryWithOptions} from './Feature.js';
+import JSONFeature from './JSONFeature.js';
 import GeometryLayout from '../geom/GeometryLayout.js';
 import GeometryType from '../geom/GeometryType.js';
 import LineString from '../geom/LineString.js';
@@ -16,15 +15,37 @@ import MultiPoint from '../geom/MultiPoint.js';
 import MultiPolygon from '../geom/MultiPolygon.js';
 import Point from '../geom/Point.js';
 import Polygon from '../geom/Polygon.js';
-import _ol_geom_flat_deflate_ from '../geom/flat/deflate.js';
-import _ol_geom_flat_orient_ from '../geom/flat/orient.js';
-import {assign, isEmpty} from '../obj.js';
+import {deflateCoordinates} from '../geom/flat/deflate.js';
+import {linearRingIsClockwise} from '../geom/flat/orient.js';
+import {isEmpty} from '../obj.js';
 import {get as getProjection} from '../proj.js';
+
+/**
+ * @typedef {import("arcgis-rest-api").Feature} EsriJSONFeature
+ * @typedef {import("arcgis-rest-api").FeatureSet} EsriJSONFeatureSet
+ * @typedef {import("arcgis-rest-api").Geometry} EsriJSONGeometry
+ * @typedef {import("arcgis-rest-api").Point} EsriJSONPoint
+ * @typedef {import("arcgis-rest-api").Polyline} EsriJSONPolyline
+ * @typedef {import("arcgis-rest-api").Polygon} EsriJSONPolygon
+ * @typedef {import("arcgis-rest-api").Multipoint} EsriJSONMultipoint
+ * @typedef {import("arcgis-rest-api").HasZM} EsriJSONHasZM
+ * @typedef {import("arcgis-rest-api").Position} EsriJSONPosition
+ * @typedef {import("arcgis-rest-api").SpatialReferenceWkid} EsriJSONSpatialReferenceWkid
+ */
+
+
+/**
+ * @typedef {Object} EsriJSONMultiPolygon
+ * @property {Array<Array<Array<Array<number>>>>} rings Rings for the MultiPolygon.
+ * @property {boolean} [hasM] If the polygon coordinates have an M value.
+ * @property {boolean} [hasZ] If the polygon coordinates have a Z value.
+ * @property {EsriJSONSpatialReferenceWkid} [spatialReference] The coordinate reference system.
+ */
 
 
 /**
  * @const
- * @type {Object.<ol.geom.GeometryType, function(EsriJSONGeometry): ol.geom.Geometry>}
+ * @type {Object<import("../geom/GeometryType.js").default, function(EsriJSONGeometry): import("../geom/Geometry.js").default>}
  */
 const GEOMETRY_READERS = {};
 GEOMETRY_READERS[GeometryType.POINT] = readPointGeometry;
@@ -37,7 +58,7 @@ GEOMETRY_READERS[GeometryType.MULTI_POLYGON] = readMultiPolygonGeometry;
 
 /**
  * @const
- * @type {Object.<string, function(ol.geom.Geometry, olx.format.WriteOptions=): (EsriJSONGeometry)>}
+ * @type {Object<string, function(import("../geom/Geometry.js").default, import("./Feature.js").WriteOptions=): (EsriJSONGeometry)>}
  */
 const GEOMETRY_WRITERS = {};
 GEOMETRY_WRITERS[GeometryType.POINT] = writePointGeometry;
@@ -49,70 +70,200 @@ GEOMETRY_WRITERS[GeometryType.MULTI_POLYGON] = writeMultiPolygonGeometry;
 
 
 /**
+ * @typedef {Object} Options
+ * @property {string} [geometryName] Geometry name to use when creating features.
+ */
+
+
+/**
  * @classdesc
  * Feature format for reading and writing data in the EsriJSON format.
  *
- * @constructor
- * @extends {ol.format.JSONFeature}
- * @param {olx.format.EsriJSONOptions=} opt_options Options.
  * @api
  */
-const EsriJSON = function(opt_options) {
-
-  const options = opt_options ? opt_options : {};
-
-  JSONFeature.call(this);
+class EsriJSON extends JSONFeature {
 
   /**
-   * Name of the geometry attribute for features.
-   * @type {string|undefined}
-   * @private
+   * @param {Options=} opt_options Options.
    */
-  this.geometryName_ = options.geometryName;
+  constructor(opt_options) {
 
-};
+    const options = opt_options ? opt_options : {};
 
-inherits(EsriJSON, JSONFeature);
+    super();
+
+    /**
+     * Name of the geometry attribute for features.
+     * @type {string|undefined}
+     * @private
+     */
+    this.geometryName_ = options.geometryName;
+
+  }
+
+  /**
+   * @inheritDoc
+   */
+  readFeatureFromObject(object, opt_options) {
+    const esriJSONFeature = /** @type {EsriJSONFeature} */ (object);
+    const geometry = readGeometry(esriJSONFeature.geometry, opt_options);
+    const feature = new Feature();
+    if (this.geometryName_) {
+      feature.setGeometryName(this.geometryName_);
+    }
+    feature.setGeometry(geometry);
+    if (opt_options && opt_options.idField &&
+      esriJSONFeature.attributes[opt_options.idField]) {
+      feature.setId(/** @type {number} */(esriJSONFeature.attributes[opt_options.idField]));
+    }
+    if (esriJSONFeature.attributes) {
+      feature.setProperties(esriJSONFeature.attributes, true);
+    }
+    return feature;
+  }
+
+  /**
+   * @inheritDoc
+   */
+  readFeaturesFromObject(object, opt_options) {
+    const options = opt_options ? opt_options : {};
+    if (object['features']) {
+      const esriJSONFeatureSet = /** @type {EsriJSONFeatureSet} */ (object);
+      /** @type {Array<import("../Feature.js").default>} */
+      const features = [];
+      const esriJSONFeatures = esriJSONFeatureSet.features;
+      options.idField = object.objectIdFieldName;
+      for (let i = 0, ii = esriJSONFeatures.length; i < ii; ++i) {
+        features.push(this.readFeatureFromObject(esriJSONFeatures[i], options));
+      }
+      return features;
+    } else {
+      return [this.readFeatureFromObject(object, options)];
+    }
+  }
+
+  /**
+   * @inheritDoc
+   */
+  readGeometryFromObject(object, opt_options) {
+    return readGeometry(/** @type {EsriJSONGeometry} */(object), opt_options);
+  }
+
+  /**
+   * @inheritDoc
+   */
+  readProjectionFromObject(object) {
+    if (object['spatialReference'] && object['spatialReference']['wkid'] !== undefined) {
+      const spatialReference = /** @type {EsriJSONSpatialReferenceWkid} */ (object['spatialReference']);
+      const crs = spatialReference.wkid;
+      return getProjection('EPSG:' + crs);
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Encode a geometry as a EsriJSON object.
+   *
+   * @param {import("../geom/Geometry.js").default} geometry Geometry.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {EsriJSONGeometry} Object.
+   * @override
+   * @api
+   */
+  writeGeometryObject(geometry, opt_options) {
+    return writeGeometry(geometry, this.adaptOptions(opt_options));
+  }
+
+  /**
+   * Encode a feature as a esriJSON Feature object.
+   *
+   * @param {import("../Feature.js").default} feature Feature.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {Object} Object.
+   * @override
+   * @api
+   */
+  writeFeatureObject(feature, opt_options) {
+    opt_options = this.adaptOptions(opt_options);
+    const object = {};
+    const geometry = feature.getGeometry();
+    if (geometry) {
+      object['geometry'] = writeGeometry(geometry, opt_options);
+      if (opt_options && opt_options.featureProjection) {
+        object['geometry']['spatialReference'] = /** @type {EsriJSONSpatialReferenceWkid} */({
+          wkid: Number(getProjection(opt_options.featureProjection).getCode().split(':').pop())
+        });
+      }
+    }
+    const properties = feature.getProperties();
+    delete properties[feature.getGeometryName()];
+    if (!isEmpty(properties)) {
+      object['attributes'] = properties;
+    } else {
+      object['attributes'] = {};
+    }
+    return object;
+  }
+
+  /**
+   * Encode an array of features as a EsriJSON object.
+   *
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {EsriJSONFeatureSet} EsriJSON Object.
+   * @override
+   * @api
+   */
+  writeFeaturesObject(features, opt_options) {
+    opt_options = this.adaptOptions(opt_options);
+    const objects = [];
+    for (let i = 0, ii = features.length; i < ii; ++i) {
+      objects.push(this.writeFeatureObject(features[i], opt_options));
+    }
+    return {
+      'features': objects
+    };
+  }
+}
 
 
 /**
  * @param {EsriJSONGeometry} object Object.
- * @param {olx.format.ReadOptions=} opt_options Read options.
- * @return {ol.geom.Geometry} Geometry.
+ * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+ * @return {import("../geom/Geometry.js").default} Geometry.
  */
 function readGeometry(object, opt_options) {
   if (!object) {
     return null;
   }
-  /** @type {ol.geom.GeometryType} */
+  /** @type {import("../geom/GeometryType.js").default} */
   let type;
-  if (typeof object.x === 'number' && typeof object.y === 'number') {
+  if (typeof object['x'] === 'number' && typeof object['y'] === 'number') {
     type = GeometryType.POINT;
-  } else if (object.points) {
+  } else if (object['points']) {
     type = GeometryType.MULTI_POINT;
-  } else if (object.paths) {
-    if (object.paths.length === 1) {
+  } else if (object['paths']) {
+    const esriJSONPolyline = /** @type {EsriJSONPolyline} */ (object);
+    if (esriJSONPolyline.paths.length === 1) {
       type = GeometryType.LINE_STRING;
     } else {
       type = GeometryType.MULTI_LINE_STRING;
     }
-  } else if (object.rings) {
-    const layout = getGeometryLayout(object);
-    const rings = convertRings(object.rings, layout);
-    object = /** @type {EsriJSONGeometry} */(assign({}, object));
+  } else if (object['rings']) {
+    const esriJSONPolygon = /** @type {EsriJSONPolygon} */ (object);
+    const layout = getGeometryLayout(esriJSONPolygon);
+    const rings = convertRings(esriJSONPolygon.rings, layout);
     if (rings.length === 1) {
       type = GeometryType.POLYGON;
-      object.rings = rings[0];
+      object = Object.assign({}, object, {['rings']: rings[0]});
     } else {
       type = GeometryType.MULTI_POLYGON;
-      object.rings = rings;
+      object = Object.assign({}, object, {['rings']: rings});
     }
   }
   const geometryReader = GEOMETRY_READERS[type];
-  return (
-    /** @type {ol.geom.Geometry} */ transformWithOptions(
-      geometryReader(object), false, opt_options)
-  );
+  return transformGeometryWithOptions(geometryReader(object), false, opt_options);
 }
 
 
@@ -121,9 +272,9 @@ function readGeometry(object, opt_options) {
  * Checks if any polygons in this array contain any other polygons in this
  * array. It is used for checking for holes.
  * Logic inspired by: https://github.com/Esri/terraformer-arcgis-parser
- * @param {Array.<!Array.<!Array.<number>>>} rings Rings.
- * @param {ol.geom.GeometryLayout} layout Geometry layout.
- * @return {Array.<!Array.<!Array.<number>>>} Transformed rings.
+ * @param {Array<!Array<!Array<number>>>} rings Rings.
+ * @param {import("../geom/GeometryLayout.js").default} layout Geometry layout.
+ * @return {Array<!Array<!Array<!Array<number>>>>} Transformed rings.
  */
 function convertRings(rings, layout) {
   const flatRing = [];
@@ -132,9 +283,9 @@ function convertRings(rings, layout) {
   let i, ii;
   for (i = 0, ii = rings.length; i < ii; ++i) {
     flatRing.length = 0;
-    _ol_geom_flat_deflate_.coordinates(flatRing, 0, rings[i], layout.length);
+    deflateCoordinates(flatRing, 0, rings[i], layout.length);
     // is this ring an outer ring? is it clockwise?
-    const clockwise = _ol_geom_flat_orient_.linearRingIsClockwise(flatRing, 0,
+    const clockwise = linearRingIsClockwise(flatRing, 0,
       flatRing.length, layout.length);
     if (clockwise) {
       outerRings.push([rings[i]]);
@@ -170,8 +321,8 @@ function convertRings(rings, layout) {
 
 
 /**
- * @param {EsriJSONGeometry} object Object.
- * @return {ol.geom.Geometry} Point.
+ * @param {EsriJSONPoint} object Object.
+ * @return {import("../geom/Geometry.js").default} Point.
  */
 function readPointGeometry(object) {
   let point;
@@ -192,8 +343,8 @@ function readPointGeometry(object) {
 
 
 /**
- * @param {EsriJSONGeometry} object Object.
- * @return {ol.geom.Geometry} LineString.
+ * @param {EsriJSONPolyline} object Object.
+ * @return {import("../geom/Geometry.js").default} LineString.
  */
 function readLineStringGeometry(object) {
   const layout = getGeometryLayout(object);
@@ -202,8 +353,8 @@ function readLineStringGeometry(object) {
 
 
 /**
- * @param {EsriJSONGeometry} object Object.
- * @return {ol.geom.Geometry} MultiLineString.
+ * @param {EsriJSONPolyline} object Object.
+ * @return {import("../geom/Geometry.js").default} MultiLineString.
  */
 function readMultiLineStringGeometry(object) {
   const layout = getGeometryLayout(object);
@@ -212,8 +363,8 @@ function readMultiLineStringGeometry(object) {
 
 
 /**
- * @param {EsriJSONGeometry} object Object.
- * @return {ol.geom.GeometryLayout} The geometry layout to use.
+ * @param {EsriJSONHasZM} object Object.
+ * @return {import("../geom/GeometryLayout.js").default} The geometry layout to use.
  */
 function getGeometryLayout(object) {
   let layout = GeometryLayout.XY;
@@ -229,8 +380,8 @@ function getGeometryLayout(object) {
 
 
 /**
- * @param {EsriJSONGeometry} object Object.
- * @return {ol.geom.Geometry} MultiPoint.
+ * @param {EsriJSONMultipoint} object Object.
+ * @return {import("../geom/Geometry.js").default} MultiPoint.
  */
 function readMultiPointGeometry(object) {
   const layout = getGeometryLayout(object);
@@ -239,20 +390,18 @@ function readMultiPointGeometry(object) {
 
 
 /**
- * @param {EsriJSONGeometry} object Object.
- * @return {ol.geom.Geometry} MultiPolygon.
+ * @param {EsriJSONMultiPolygon} object Object.
+ * @return {import("../geom/Geometry.js").default} MultiPolygon.
  */
 function readMultiPolygonGeometry(object) {
   const layout = getGeometryLayout(object);
-  return new MultiPolygon(
-    /** @type {Array.<Array.<Array.<Array.<number>>>>} */(object.rings),
-    layout);
+  return new MultiPolygon(object.rings, layout);
 }
 
 
 /**
- * @param {EsriJSONGeometry} object Object.
- * @return {ol.geom.Geometry} Polygon.
+ * @param {EsriJSONPolygon} object Object.
+ * @return {import("../geom/Geometry.js").default} Polygon.
  */
 function readPolygonGeometry(object) {
   const layout = getGeometryLayout(object);
@@ -261,47 +410,48 @@ function readPolygonGeometry(object) {
 
 
 /**
- * @param {ol.geom.Geometry} geometry Geometry.
- * @param {olx.format.WriteOptions=} opt_options Write options.
- * @return {EsriJSONGeometry} EsriJSON geometry.
+ * @param {import("../geom/Point.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {EsriJSONPoint} EsriJSON geometry.
  */
 function writePointGeometry(geometry, opt_options) {
-  const coordinates = /** @type {ol.geom.Point} */ (geometry).getCoordinates();
+  const coordinates = geometry.getCoordinates();
+  /** @type {EsriJSONPoint} */
   let esriJSON;
-  const layout = /** @type {ol.geom.Point} */ (geometry).getLayout();
+  const layout = geometry.getLayout();
   if (layout === GeometryLayout.XYZ) {
-    esriJSON = /** @type {EsriJSONPoint} */ ({
+    esriJSON = {
       x: coordinates[0],
       y: coordinates[1],
       z: coordinates[2]
-    });
+    };
   } else if (layout === GeometryLayout.XYM) {
-    esriJSON = /** @type {EsriJSONPoint} */ ({
+    esriJSON = {
       x: coordinates[0],
       y: coordinates[1],
       m: coordinates[2]
-    });
+    };
   } else if (layout === GeometryLayout.XYZM) {
-    esriJSON = /** @type {EsriJSONPoint} */ ({
+    esriJSON = {
       x: coordinates[0],
       y: coordinates[1],
       z: coordinates[2],
       m: coordinates[3]
-    });
+    };
   } else if (layout === GeometryLayout.XY) {
-    esriJSON = /** @type {EsriJSONPoint} */ ({
+    esriJSON = {
       x: coordinates[0],
       y: coordinates[1]
-    });
+    };
   } else {
     assert(false, 34); // Invalid geometry layout
   }
-  return /** @type {EsriJSONGeometry} */ (esriJSON);
+  return esriJSON;
 }
 
 
 /**
- * @param {ol.geom.SimpleGeometry} geometry Geometry.
+ * @param {import("../geom/SimpleGeometry.js").default} geometry Geometry.
  * @return {Object} Object with boolean hasZ and hasM keys.
  */
 function getHasZM(geometry) {
@@ -316,331 +466,99 @@ function getHasZM(geometry) {
 
 
 /**
- * @param {ol.geom.Geometry} geometry Geometry.
- * @param {olx.format.WriteOptions=} opt_options Write options.
+ * @param {import("../geom/LineString.js").default} lineString Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
  * @return {EsriJSONPolyline} EsriJSON geometry.
  */
-function writeLineStringGeometry(geometry, opt_options) {
-  const hasZM = getHasZM(/** @type {ol.geom.LineString} */(geometry));
-  return /** @type {EsriJSONPolyline} */ ({
+function writeLineStringGeometry(lineString, opt_options) {
+  const hasZM = getHasZM(lineString);
+  return {
     hasZ: hasZM.hasZ,
     hasM: hasZM.hasM,
     paths: [
-      /** @type {ol.geom.LineString} */ (geometry).getCoordinates()
+      /** @type {Array<EsriJSONPosition>} */ (lineString.getCoordinates())
     ]
-  });
+  };
 }
 
 
 /**
- * @param {ol.geom.Geometry} geometry Geometry.
- * @param {olx.format.WriteOptions=} opt_options Write options.
+ * @param {import("../geom/Polygon.js").default} polygon Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
  * @return {EsriJSONPolygon} EsriJSON geometry.
  */
-function writePolygonGeometry(geometry, opt_options) {
+function writePolygonGeometry(polygon, opt_options) {
   // Esri geometries use the left-hand rule
-  const hasZM = getHasZM(/** @type {ol.geom.Polygon} */(geometry));
-  return /** @type {EsriJSONPolygon} */ ({
+  const hasZM = getHasZM(polygon);
+  return {
     hasZ: hasZM.hasZ,
     hasM: hasZM.hasM,
-    rings: /** @type {ol.geom.Polygon} */ (geometry).getCoordinates(false)
-  });
+    rings: /** @type {Array<Array<EsriJSONPosition>>} */ (polygon.getCoordinates(false))
+  };
 }
 
 
 /**
- * @param {ol.geom.Geometry} geometry Geometry.
- * @param {olx.format.WriteOptions=} opt_options Write options.
+ * @param {import("../geom/MultiLineString.js").default} multiLineString Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
  * @return {EsriJSONPolyline} EsriJSON geometry.
  */
-function writeMultiLineStringGeometry(geometry, opt_options) {
-  const hasZM = getHasZM(/** @type {ol.geom.MultiLineString} */(geometry));
-  return /** @type {EsriJSONPolyline} */ ({
+function writeMultiLineStringGeometry(multiLineString, opt_options) {
+  const hasZM = getHasZM(multiLineString);
+  return {
     hasZ: hasZM.hasZ,
     hasM: hasZM.hasM,
-    paths: /** @type {ol.geom.MultiLineString} */ (geometry).getCoordinates()
-  });
+    paths: /** @type {Array<Array<EsriJSONPosition>>} */ (multiLineString.getCoordinates())
+  };
 }
 
 
 /**
- * @param {ol.geom.Geometry} geometry Geometry.
- * @param {olx.format.WriteOptions=} opt_options Write options.
+ * @param {import("../geom/MultiPoint.js").default} multiPoint Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
  * @return {EsriJSONMultipoint} EsriJSON geometry.
  */
-function writeMultiPointGeometry(geometry, opt_options) {
-  const hasZM = getHasZM(/** @type {ol.geom.MultiPoint} */(geometry));
-  return /** @type {EsriJSONMultipoint} */ ({
+function writeMultiPointGeometry(multiPoint, opt_options) {
+  const hasZM = getHasZM(multiPoint);
+  return {
     hasZ: hasZM.hasZ,
     hasM: hasZM.hasM,
-    points: /** @type {ol.geom.MultiPoint} */ (geometry).getCoordinates()
-  });
+    points: /** @type {Array<EsriJSONPosition>} */ (multiPoint.getCoordinates())
+  };
 }
 
 
 /**
- * @param {ol.geom.Geometry} geometry Geometry.
- * @param {olx.format.WriteOptions=} opt_options Write options.
+ * @param {import("../geom/MultiPolygon.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
  * @return {EsriJSONPolygon} EsriJSON geometry.
  */
 function writeMultiPolygonGeometry(geometry, opt_options) {
-  const hasZM = getHasZM(/** @type {ol.geom.MultiPolygon} */(geometry));
-  const coordinates = /** @type {ol.geom.MultiPolygon} */ (geometry).getCoordinates(false);
+  const hasZM = getHasZM(geometry);
+  const coordinates = geometry.getCoordinates(false);
   const output = [];
   for (let i = 0; i < coordinates.length; i++) {
     for (let x = coordinates[i].length - 1; x >= 0; x--) {
       output.push(coordinates[i][x]);
     }
   }
-  return /** @type {EsriJSONPolygon} */ ({
+  return {
     hasZ: hasZM.hasZ,
     hasM: hasZM.hasM,
-    rings: output
-  });
+    rings: /** @type {Array<Array<EsriJSONPosition>>} */ (output)
+  };
 }
 
 
 /**
- * Read a feature from a EsriJSON Feature source.  Only works for Feature,
- * use `readFeatures` to read FeatureCollection source.
- *
- * @function
- * @param {ArrayBuffer|Document|Node|Object|string} source Source.
- * @param {olx.format.ReadOptions=} opt_options Read options.
- * @return {ol.Feature} Feature.
- * @api
- */
-EsriJSON.prototype.readFeature;
-
-
-/**
- * Read all features from a EsriJSON source.  Works with both Feature and
- * FeatureCollection sources.
- *
- * @function
- * @param {ArrayBuffer|Document|Node|Object|string} source Source.
- * @param {olx.format.ReadOptions=} opt_options Read options.
- * @return {Array.<ol.Feature>} Features.
- * @api
- */
-EsriJSON.prototype.readFeatures;
-
-
-/**
- * @inheritDoc
- */
-EsriJSON.prototype.readFeatureFromObject = function(
-  object, opt_options) {
-  const esriJSONFeature = /** @type {EsriJSONFeature} */ (object);
-  const geometry = readGeometry(esriJSONFeature.geometry,
-    opt_options);
-  const feature = new Feature();
-  if (this.geometryName_) {
-    feature.setGeometryName(this.geometryName_);
-  }
-  feature.setGeometry(geometry);
-  if (opt_options && opt_options.idField &&
-    esriJSONFeature.attributes[opt_options.idField]) {
-    feature.setId(/** @type {number} */(
-      esriJSONFeature.attributes[opt_options.idField]));
-  }
-  if (esriJSONFeature.attributes) {
-    feature.setProperties(esriJSONFeature.attributes);
-  }
-  return feature;
-};
-
-
-/**
- * @inheritDoc
- */
-EsriJSON.prototype.readFeaturesFromObject = function(
-  object, opt_options) {
-  const esriJSONObject = /** @type {EsriJSONObject} */ (object);
-  const options = opt_options ? opt_options : {};
-  if (esriJSONObject.features) {
-    const esriJSONFeatureCollection = /** @type {EsriJSONFeatureCollection} */
-      (object);
-    /** @type {Array.<ol.Feature>} */
-    const features = [];
-    const esriJSONFeatures = esriJSONFeatureCollection.features;
-    let i, ii;
-    options.idField = object.objectIdFieldName;
-    for (i = 0, ii = esriJSONFeatures.length; i < ii; ++i) {
-      features.push(this.readFeatureFromObject(esriJSONFeatures[i],
-        options));
-    }
-    return features;
-  } else {
-    return [this.readFeatureFromObject(object, options)];
-  }
-};
-
-
-/**
- * Read a geometry from a EsriJSON source.
- *
- * @function
- * @param {ArrayBuffer|Document|Node|Object|string} source Source.
- * @param {olx.format.ReadOptions=} opt_options Read options.
- * @return {ol.geom.Geometry} Geometry.
- * @api
- */
-EsriJSON.prototype.readGeometry;
-
-
-/**
- * @inheritDoc
- */
-EsriJSON.prototype.readGeometryFromObject = function(
-  object, opt_options) {
-  return readGeometry(
-    /** @type {EsriJSONGeometry} */(object), opt_options);
-};
-
-
-/**
- * Read the projection from a EsriJSON source.
- *
- * @function
- * @param {ArrayBuffer|Document|Node|Object|string} source Source.
- * @return {ol.proj.Projection} Projection.
- * @api
- */
-EsriJSON.prototype.readProjection;
-
-
-/**
- * @inheritDoc
- */
-EsriJSON.prototype.readProjectionFromObject = function(object) {
-  const esriJSONObject = /** @type {EsriJSONObject} */ (object);
-  if (esriJSONObject.spatialReference && esriJSONObject.spatialReference.wkid) {
-    const crs = esriJSONObject.spatialReference.wkid;
-    return getProjection('EPSG:' + crs);
-  } else {
-    return null;
-  }
-};
-
-
-/**
- * @param {ol.geom.Geometry} geometry Geometry.
- * @param {olx.format.WriteOptions=} opt_options Write options.
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
  * @return {EsriJSONGeometry} EsriJSON geometry.
  */
 function writeGeometry(geometry, opt_options) {
   const geometryWriter = GEOMETRY_WRITERS[geometry.getType()];
-  return geometryWriter(/** @type {ol.geom.Geometry} */(
-    transformWithOptions(geometry, true, opt_options)), opt_options);
+  return geometryWriter(transformGeometryWithOptions(geometry, true, opt_options), opt_options);
 }
 
-
-/**
- * Encode a geometry as a EsriJSON string.
- *
- * @function
- * @param {ol.geom.Geometry} geometry Geometry.
- * @param {olx.format.WriteOptions=} opt_options Write options.
- * @return {string} EsriJSON.
- * @api
- */
-EsriJSON.prototype.writeGeometry;
-
-
-/**
- * Encode a geometry as a EsriJSON object.
- *
- * @param {ol.geom.Geometry} geometry Geometry.
- * @param {olx.format.WriteOptions=} opt_options Write options.
- * @return {EsriJSONGeometry} Object.
- * @override
- * @api
- */
-EsriJSON.prototype.writeGeometryObject = function(geometry,
-  opt_options) {
-  return writeGeometry(geometry,
-    this.adaptOptions(opt_options));
-};
-
-
-/**
- * Encode a feature as a EsriJSON Feature string.
- *
- * @function
- * @param {ol.Feature} feature Feature.
- * @param {olx.format.WriteOptions=} opt_options Write options.
- * @return {string} EsriJSON.
- * @api
- */
-EsriJSON.prototype.writeFeature;
-
-
-/**
- * Encode a feature as a esriJSON Feature object.
- *
- * @param {ol.Feature} feature Feature.
- * @param {olx.format.WriteOptions=} opt_options Write options.
- * @return {Object} Object.
- * @override
- * @api
- */
-EsriJSON.prototype.writeFeatureObject = function(
-  feature, opt_options) {
-  opt_options = this.adaptOptions(opt_options);
-  const object = {};
-  const geometry = feature.getGeometry();
-  if (geometry) {
-    object['geometry'] =
-      writeGeometry(geometry, opt_options);
-    if (opt_options && opt_options.featureProjection) {
-      object['geometry']['spatialReference'] = /** @type {EsriJSONCRS} */({
-        wkid: getProjection(opt_options.featureProjection).getCode().split(':').pop()
-      });
-    }
-  }
-  const properties = feature.getProperties();
-  delete properties[feature.getGeometryName()];
-  if (!isEmpty(properties)) {
-    object['attributes'] = properties;
-  } else {
-    object['attributes'] = {};
-  }
-  return object;
-};
-
-
-/**
- * Encode an array of features as EsriJSON.
- *
- * @function
- * @param {Array.<ol.Feature>} features Features.
- * @param {olx.format.WriteOptions=} opt_options Write options.
- * @return {string} EsriJSON.
- * @api
- */
-EsriJSON.prototype.writeFeatures;
-
-
-/**
- * Encode an array of features as a EsriJSON object.
- *
- * @param {Array.<ol.Feature>} features Features.
- * @param {olx.format.WriteOptions=} opt_options Write options.
- * @return {Object} EsriJSON Object.
- * @override
- * @api
- */
-EsriJSON.prototype.writeFeaturesObject = function(features, opt_options) {
-  opt_options = this.adaptOptions(opt_options);
-  const objects = [];
-  let i, ii;
-  for (i = 0, ii = features.length; i < ii; ++i) {
-    objects.push(this.writeFeatureObject(features[i], opt_options));
-  }
-  return /** @type {EsriJSONFeatureCollection} */ ({
-    'features': objects
-  });
-};
 
 export default EsriJSON;

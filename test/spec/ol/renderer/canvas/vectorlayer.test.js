@@ -1,15 +1,18 @@
-import {getUid} from '../../../../../src/ol/index.js';
 import Feature from '../../../../../src/ol/Feature.js';
 import Map from '../../../../../src/ol/Map.js';
 import View from '../../../../../src/ol/View.js';
-import * as _ol_extent_ from '../../../../../src/ol/extent.js';
+import {buffer as bufferExtent, getWidth} from '../../../../../src/ol/extent.js';
+import Circle from '../../../../../src/ol/geom/Circle.js';
 import Point from '../../../../../src/ol/geom/Point.js';
+import {fromExtent} from '../../../../../src/ol/geom/Polygon.js';
 import VectorLayer from '../../../../../src/ol/layer/Vector.js';
-import {clear} from '../../../../../src/ol/obj.js';
 import {get as getProjection} from '../../../../../src/ol/proj.js';
-import _ol_render_canvas_ from '../../../../../src/ol/render/canvas.js';
+import {checkedFonts} from '../../../../../src/ol/render/canvas.js';
 import CanvasVectorLayerRenderer from '../../../../../src/ol/renderer/canvas/VectorLayer.js';
 import VectorSource from '../../../../../src/ol/source/Vector.js';
+import CircleStyle from '../../../../../src/ol/style/Circle.js';
+import Fill from '../../../../../src/ol/style/Fill.js';
+import Stroke from '../../../../../src/ol/style/Stroke.js';
 import Style from '../../../../../src/ol/style/Style.js';
 import Text from '../../../../../src/ol/style/Text.js';
 
@@ -76,16 +79,15 @@ describe('ol.renderer.canvas.VectorLayer', function() {
         style: layerStyle
       });
       map.addLayer(layer);
-      const spy = sinon.spy(map.getRenderer().getLayerRenderer(layer),
-        'renderFeature');
+      const spy = sinon.spy(layer.getRenderer(), 'renderFeature');
       map.renderSync();
-      expect(spy.getCall(0).args[3]).to.be(layerStyle);
-      expect(spy.getCall(1).args[3]).to.be(featureStyle);
+      expect(spy.getCall(0).args[2]).to.be(layerStyle);
+      expect(spy.getCall(1).args[2]).to.be(featureStyle);
       document.body.removeChild(target);
     });
 
     it('does not re-render for unavailable fonts', function(done) {
-      clear(_ol_render_canvas_.checkedFonts_);
+      checkedFonts.values_ = {};
       const map = new Map({
         view: new View({
           center: [0, 0],
@@ -116,7 +118,7 @@ describe('ol.renderer.canvas.VectorLayer', function() {
     });
 
     it('does not re-render for available fonts', function(done) {
-      clear(_ol_render_canvas_.checkedFonts_);
+      checkedFonts.values_ = {};
       const map = new Map({
         view: new View({
           center: [0, 0],
@@ -147,7 +149,7 @@ describe('ol.renderer.canvas.VectorLayer', function() {
     });
 
     it('re-renders for fonts that become available', function(done) {
-      clear(_ol_render_canvas_.checkedFonts_);
+      checkedFonts.values_ = {};
       head.appendChild(font);
       const map = new Map({
         view: new View({
@@ -192,7 +194,7 @@ describe('ol.renderer.canvas.VectorLayer', function() {
       const replayGroup = {};
       renderer.replayGroup_ = replayGroup;
       replayGroup.forEachFeatureAtCoordinate = function(coordinate,
-        resolution, rotation, hitTolerance, skippedFeaturesUids, callback) {
+        resolution, rotation, hitTolerance, callback) {
         const feature = new Feature();
         callback(feature);
         callback(feature);
@@ -203,14 +205,13 @@ describe('ol.renderer.canvas.VectorLayer', function() {
       const spy = sinon.spy();
       const coordinate = [0, 0];
       const frameState = {
-        layerStates: {},
-        skippedFeatureUids: {},
+        layerStatesArray: [{}],
         viewState: {
+          center: [0, 0],
           resolution: 1,
           rotation: 0
         }
       };
-      frameState.layerStates[getUid(layer)] = {};
       renderer.forEachFeatureAtCoordinate(
         coordinate, frameState, 0, spy, undefined);
       expect(spy.callCount).to.be(1);
@@ -218,7 +219,7 @@ describe('ol.renderer.canvas.VectorLayer', function() {
     });
   });
 
-  describe('#prepareFrame', function() {
+  describe('#prepareFrame and #compose', function() {
     let frameState, projExtent, renderer, worldWidth, buffer;
 
     beforeEach(function() {
@@ -228,12 +229,12 @@ describe('ol.renderer.canvas.VectorLayer', function() {
       renderer = new CanvasVectorLayerRenderer(layer);
       const projection = getProjection('EPSG:3857');
       projExtent = projection.getExtent();
-      worldWidth = _ol_extent_.getWidth(projExtent);
+      worldWidth = getWidth(projExtent);
       buffer = layer.getRenderBuffer();
       frameState = {
-        skippedFeatureUids: {},
         viewHints: [],
         viewState: {
+          center: [0, 0],
           projection: projection,
           resolution: 1,
           rotation: 0
@@ -245,8 +246,8 @@ describe('ol.renderer.canvas.VectorLayer', function() {
 
       frameState.extent =
           [projExtent[0] - 10000, -10000, projExtent[0] + 10000, 10000];
-      renderer.prepareFrame(frameState, {});
-      expect(renderer.replayGroup_.maxExtent_).to.eql(_ol_extent_.buffer([
+      renderer.prepareFrame(frameState);
+      expect(renderer.replayGroup_.maxExtent_).to.eql(bufferExtent([
         projExtent[0] - worldWidth + buffer,
         -10000, projExtent[2] + worldWidth - buffer, 10000
       ], buffer));
@@ -257,8 +258,8 @@ describe('ol.renderer.canvas.VectorLayer', function() {
 
       frameState.extent =
           [projExtent[0] - 10000, -10000, projExtent[1] - 10000, 10000];
-      renderer.prepareFrame(frameState, {});
-      expect(renderer.replayGroup_.maxExtent_).to.eql(_ol_extent_.buffer([
+      renderer.prepareFrame(frameState);
+      expect(renderer.replayGroup_.maxExtent_).to.eql(bufferExtent([
         projExtent[0] - worldWidth + buffer,
         -10000, projExtent[2] + worldWidth - buffer, 10000
       ], buffer));
@@ -268,8 +269,8 @@ describe('ol.renderer.canvas.VectorLayer', function() {
 
       frameState.extent =
           [2 * projExtent[0] - 10000, -10000, 2 * projExtent[1] + 10000, 10000];
-      renderer.prepareFrame(frameState, {});
-      expect(renderer.replayGroup_.maxExtent_).to.eql(_ol_extent_.buffer([
+      renderer.prepareFrame(frameState);
+      expect(renderer.replayGroup_.maxExtent_).to.eql(bufferExtent([
         projExtent[0] - worldWidth + buffer,
         -10000, projExtent[2] + worldWidth - buffer, 10000
       ], buffer));
@@ -281,8 +282,8 @@ describe('ol.renderer.canvas.VectorLayer', function() {
         projExtent[0] - 2 * worldWidth - 10000,
         -10000, projExtent[1] + 2 * worldWidth + 10000, 10000
       ];
-      renderer.prepareFrame(frameState, {});
-      expect(renderer.replayGroup_.maxExtent_).to.eql(_ol_extent_.buffer([
+      renderer.prepareFrame(frameState);
+      expect(renderer.replayGroup_.maxExtent_).to.eql(bufferExtent([
         projExtent[0] - 2 * worldWidth - 10000,
         -10000, projExtent[2] + 2 * worldWidth + 10000, 10000
       ], buffer));
@@ -290,10 +291,247 @@ describe('ol.renderer.canvas.VectorLayer', function() {
 
     it('sets replayGroupChanged correctly', function() {
       frameState.extent = [-10000, -10000, 10000, 10000];
-      renderer.prepareFrame(frameState, {});
+      renderer.prepareFrame(frameState);
       expect(renderer.replayGroupChanged).to.be(true);
-      renderer.prepareFrame(frameState, {});
+      renderer.prepareFrame(frameState);
       expect(renderer.replayGroupChanged).to.be(false);
+    });
+
+    it('dispatches a postrender event when rendering', function(done) {
+      const layer = renderer.getLayer();
+      layer.getSource().addFeature(new Feature(new Point([0, 0])));
+      layer.once('postrender', function() {
+        expect(true);
+        done();
+      });
+      frameState.layerStatesArray = [layer.getLayerState()];
+      frameState.layerIndex = 0;
+      frameState.extent = [-10000, -10000, 10000, 10000];
+      frameState.size = [100, 100];
+      frameState.viewState.center = [0, 0];
+      let rendered = false;
+      if (renderer.prepareFrame(frameState)) {
+        rendered = true;
+        renderer.renderFrame(frameState, null);
+      }
+      expect(rendered).to.be(true);
+    });
+
+  });
+
+  describe('hit detection', function() {
+
+    it('with no fill and transparent fill', function() {
+      const target = document.createElement('div');
+      target.style.width = '300px';
+      target.style.height = '300px';
+      document.body.appendChild(target);
+      const styles = {
+        transparent: new Style({
+          stroke: new Stroke({
+            color: 'blue',
+            width: 3
+          }),
+          fill: new Fill({
+            color: 'transparent'
+          }),
+          image: new CircleStyle({
+            radius: 30,
+            stroke: new Stroke({
+              color: 'blue',
+              width: 3
+            }),
+            fill: new Fill({
+              color: 'transparent'
+            })
+          })
+        }),
+        none: new Style({
+          stroke: new Stroke({
+            color: 'blue',
+            width: 3
+          }),
+          image: new CircleStyle({
+            radius: 30,
+            stroke: new Stroke({
+              color: 'blue',
+              width: 3
+            })
+          })
+        })
+      };
+      const source = new VectorSource({
+        features: [
+          new Feature({
+            geometry: fromExtent([0, 10, 3, 13]),
+            fillType: 'none'
+          }),
+          new Feature({
+            geometry: fromExtent([1, 11, 4, 14]),
+            fillType: 'none'
+          }),
+          new Feature({
+            geometry: fromExtent([5, 10, 8, 13]),
+            fillType: 'transparent'
+          }),
+          new Feature({
+            geometry: fromExtent([6, 11, 9, 14]),
+            fillType: 'transparent'
+          }),
+          new Feature({
+            geometry: new Circle([1.5, 6.5], 1.5),
+            fillType: 'none'
+          }),
+          new Feature({
+            geometry: new Circle([2.5, 7.5], 1.5),
+            fillType: 'none'
+          }),
+          new Feature({
+            geometry: new Circle([6.5, 6.5], 1.5),
+            fillType: 'transparent'
+          }),
+          new Feature({
+            geometry: new Circle([7.5, 7.5], 1.5),
+            fillType: 'transparent'
+          }),
+          new Feature({
+            geometry: new Point([1.5, 1.5]),
+            fillType: 'none'
+          }),
+          new Feature({
+            geometry: new Point([2.5, 2.5]),
+            fillType: 'none'
+          }),
+          new Feature({
+            geometry: new Point([6.5, 1.5]),
+            fillType: 'transparent'
+          }),
+          new Feature({
+            geometry: new Point([7.5, 2.5]),
+            fillType: 'transparent'
+          })
+        ]
+      });
+      const layer = new VectorLayer({
+        source: source,
+        style: function(feature, resolution) {
+          return styles[feature.get('fillType')];
+        }
+      });
+      const map = new Map({
+        layers: [layer],
+        view: new View({
+          center: [4.5, 7],
+          resolution: 0.05
+        }),
+        target: target
+      });
+      map.renderSync();
+
+      function hitTest(coordinate) {
+        const features = map.getFeaturesAtPixel(
+          map.getPixelFromCoordinate(coordinate)
+        );
+        const result = {count: 0};
+        if (features && features.length > 0) {
+          result.count = features.length;
+          result.extent = features[0].getGeometry().getExtent();
+        }
+        return result;
+      }
+      let res;
+
+      res = hitTest([0, 12]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(0);
+      res = hitTest([1, 12]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(1);
+      res = hitTest([2, 12]);
+      expect(res.count).to.be(0);
+      res = hitTest([3, 12]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(0);
+      res = hitTest([4, 12]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(1);
+      res = hitTest([5, 12]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(5);
+      res = hitTest([6, 12]);
+      expect(res.count).to.be(2);
+      expect(res.extent[0]).to.be(6);
+      res = hitTest([7, 12]);
+      expect(res.count).to.be(2);
+      expect(res.extent[0]).to.be(6);
+      res = hitTest([8, 12]);
+      expect(res.count).to.be(2);
+      expect(res.extent[0]).to.be(6);
+      res = hitTest([9, 12]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(6);
+
+      res = hitTest([0, 6.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(0);
+      res = hitTest([1, 7.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(1);
+      res = hitTest([2, 7.0]);
+      expect(res.count).to.be(0);
+      res = hitTest([3, 6.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(0);
+      res = hitTest([4, 7.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(1);
+      res = hitTest([5, 6.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(5);
+      res = hitTest([6, 7.5]);
+      expect(res.count).to.be(2);
+      expect(res.extent[0]).to.be(6);
+      res = hitTest([7, 7.0]);
+      expect(res.count).to.be(2);
+      expect(res.extent[0]).to.be(6);
+      res = hitTest([8, 6.5]);
+      expect(res.count).to.be(2);
+      expect(res.extent[0]).to.be(6);
+      res = hitTest([9, 7.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(6);
+
+      res = hitTest([0, 1.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(1.5);
+      res = hitTest([1, 2.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(2.5);
+      res = hitTest([2, 2.0]);
+      expect(res.count).to.be(0);
+      res = hitTest([3, 1.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(1.5);
+      res = hitTest([4, 2.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(2.5);
+      res = hitTest([5, 1.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(6.5);
+      res = hitTest([6, 2.5]);
+      expect(res.count).to.be(2);
+      expect(res.extent[0]).to.be(7.5);
+      res = hitTest([7, 2.0]);
+      expect(res.count).to.be(2);
+      expect(res.extent[0]).to.be(7.5);
+      res = hitTest([8, 1.5]);
+      expect(res.count).to.be(2);
+      expect(res.extent[0]).to.be(7.5);
+      res = hitTest([9, 2.5]);
+      expect(res.count).to.be(1);
+      expect(res.extent[0]).to.be(7.5);
+
+      document.body.removeChild(target);
     });
 
   });

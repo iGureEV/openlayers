@@ -1,75 +1,76 @@
 /**
  * @module ol/events/Event
  */
+
 /**
  * @classdesc
  * Stripped down implementation of the W3C DOM Level 2 Event interface.
- * @see {@link https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-interface}
+ * See https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-interface.
  *
  * This implementation only provides `type` and `target` properties, and
  * `stopPropagation` and `preventDefault` methods. It is meant as base class
  * for higher level events defined in the library, and works with
- * {@link ol.events.EventTarget}.
- *
- * @constructor
- * @implements {oli.events.Event}
- * @param {string} type Type.
+ * {@link module:ol/events/Target~Target}.
  */
-const Event = function(type) {
+class BaseEvent {
 
   /**
-   * @type {boolean}
+   * @param {string} type Type.
    */
-  this.propagationStopped;
+  constructor(type) {
 
-  /**
-   * The event type.
-   * @type {string}
-   * @api
-   */
-  this.type = type;
+    /**
+     * @type {boolean}
+     */
+    this.propagationStopped;
 
-  /**
-   * The event target.
-   * @type {Object}
-   * @api
-   */
-  this.target = null;
+    /**
+     * The event type.
+     * @type {string}
+     * @api
+     */
+    this.type = type;
 
-};
-
-
-/**
- * Stop event propagation.
- * @function
- * @override
- * @api
- */
-Event.prototype.preventDefault =
+    /**
+     * The event target.
+     * @type {Object}
+     * @api
+     */
+    this.target = null;
+  }
 
   /**
    * Stop event propagation.
-   * @function
-   * @override
    * @api
    */
-  Event.prototype.stopPropagation = function() {
+  preventDefault() {
     this.propagationStopped = true;
-  };
+  }
+
+  /**
+   * Stop event propagation.
+   * @api
+   */
+  stopPropagation() {
+    this.propagationStopped = true;
+  }
+
+}
 
 
 /**
- * @param {Event|ol.events.Event} evt Event
+ * @param {Event|import("./Event.js").default} evt Event
  */
-Event.stopPropagation = function(evt) {
+export function stopPropagation(evt) {
   evt.stopPropagation();
-};
+}
 
 
 /**
- * @param {Event|ol.events.Event} evt Event
+ * @param {Event|import("./Event.js").default} evt Event
  */
-Event.preventDefault = function(evt) {
+export function preventDefault(evt) {
   evt.preventDefault();
-};
-export default Event;
+}
+
+export default BaseEvent;

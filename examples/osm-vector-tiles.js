@@ -4,11 +4,9 @@ import TopoJSON from '../src/ol/format/TopoJSON.js';
 import VectorTileLayer from '../src/ol/layer/VectorTile.js';
 import {fromLonLat} from '../src/ol/proj.js';
 import VectorTileSource from '../src/ol/source/VectorTile.js';
-import Fill from '../src/ol/style/Fill.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
+import {Fill, Stroke, Style} from '../src/ol/style.js';
 
-const key = 'vector-tiles-5eJz6JX';
+const key = 'uZNs91nMR-muUTP99MyBSg';
 
 const roadStyleCache = {};
 const roadColor = {
@@ -69,7 +67,7 @@ const map = new Map({
           layers: ['water', 'roads', 'buildings']
         }),
         maxZoom: 19,
-        url: 'https://tile.mapzen.com/mapzen/vector/v1/all/{z}/{x}/{y}.topojson?api_key=' + key
+        url: 'https://tile.nextzen.org/tilezen/vector/v1/all/{z}/{x}/{y}.topojson?api_key=' + key
       }),
       style: function(feature, resolution) {
         switch (feature.get('layer')) {

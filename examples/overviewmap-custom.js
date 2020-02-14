@@ -1,12 +1,12 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import {defaults as defaultControls} from '../src/ol/control.js';
-import OverviewMap from '../src/ol/control/OverviewMap.js';
-import {defaults as defaultInteractions} from '../src/ol/interaction.js';
-import DragRotateAndZoom from '../src/ol/interaction/DragRotateAndZoom.js';
+import {defaults as defaultControls, OverviewMap} from '../src/ol/control.js';
+import {defaults as defaultInteractions, DragRotateAndZoom} from '../src/ol/interaction.js';
 import TileLayer from '../src/ol/layer/Tile.js';
 import OSM from '../src/ol/source/OSM.js';
 
+
+const rotateWithView = document.getElementById('rotateWithView');
 
 const overviewMapControl = new OverviewMap({
   // see in overviewmap-custom.html to see the custom CSS used
@@ -22,6 +22,10 @@ const overviewMapControl = new OverviewMap({
   collapseLabel: '\u00BB',
   label: '\u00AB',
   collapsed: false
+});
+
+rotateWithView.addEventListener('change', function() {
+  overviewMapControl.setRotateWithView(this.checked);
 });
 
 const map = new Map({

@@ -1,12 +1,8 @@
-// NOCOMPILE
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import {defaults as defaultControls} from '../src/ol/control.js';
 import WKT from '../src/ol/format/WKT.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import VectorLayer from '../src/ol/layer/Vector.js';
-import OSM from '../src/ol/source/OSM.js';
-import VectorSource from '../src/ol/source/Vector.js';
+import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
+import {OSM, Vector as VectorSource} from '../src/ol/source.js';
 
 const raster = new TileLayer({
   source: new OSM()
@@ -22,18 +18,14 @@ feature.getGeometry().transform('EPSG:4326', 'EPSG:3857');
 const vector = new VectorLayer({
   source: new VectorSource({
     features: [feature]
-  })
+  }),
+  opacity: 0.5
 });
 
 
 const map = new Map({
   layers: [raster, vector],
   target: 'map',
-  controls: defaultControls({
-    attributionOptions: {
-      collapsible: false
-    }
-  }),
   view: new View({
     center: [0, 0],
     zoom: 2
@@ -50,8 +42,6 @@ const dims = {
   a5: [210, 148]
 };
 
-let loading = 0;
-let loaded = 0;
 
 const exportButton = document.getElementById('export-pdf');
 
@@ -65,46 +55,40 @@ exportButton.addEventListener('click', function() {
   const dim = dims[format];
   const width = Math.round(dim[0] * resolution / 25.4);
   const height = Math.round(dim[1] * resolution / 25.4);
-  const size = /** @type {ol.Size} */ (map.getSize());
-  const extent = map.getView().calculateExtent(size);
+  const size = map.getSize();
+  const viewResolution = map.getView().getResolution();
 
-  const source = raster.getSource();
-
-  const tileLoadStart = function() {
-    ++loading;
-  };
-
-  function tileLoadEnd() {
-    ++loaded;
-    if (loading === loaded) {
-      const canvas = this;
-      window.setTimeout(function() {
-        loading = 0;
-        loaded = 0;
-        const data = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('landscape', undefined, format);
-        pdf.addImage(data, 'JPEG', 0, 0, dim[0], dim[1]);
-        pdf.save('map.pdf');
-        source.un('tileloadstart', tileLoadStart);
-        source.un('tileloadend', tileLoadEnd, canvas);
-        source.un('tileloaderror', tileLoadEnd, canvas);
-        map.setSize(size);
-        map.getView().fit(extent);
-        map.renderSync();
-        exportButton.disabled = false;
-        document.body.style.cursor = 'auto';
-      }, 100);
-    }
-  }
-
-  map.once('postcompose', function(event) {
-    source.on('tileloadstart', tileLoadStart);
-    source.on('tileloadend', tileLoadEnd, event.context.canvas);
-    source.on('tileloaderror', tileLoadEnd, event.context.canvas);
+  map.once('rendercomplete', function() {
+    const mapCanvas = document.createElement('canvas');
+    mapCanvas.width = width;
+    mapCanvas.height = height;
+    const mapContext = mapCanvas.getContext('2d');
+    Array.prototype.forEach.call(document.querySelectorAll('.ol-layer canvas'), function(canvas) {
+      if (canvas.width > 0) {
+        const opacity = canvas.parentNode.style.opacity;
+        mapContext.globalAlpha = opacity === '' ? 1 : Number(opacity);
+        const transform = canvas.style.transform;
+        // Get the transform parameters from the style's transform matrix
+        const matrix = transform.match(/^matrix\(([^\(]*)\)$/)[1].split(',').map(Number);
+        // Apply the transform to the export map context
+        CanvasRenderingContext2D.prototype.setTransform.apply(mapContext, matrix);
+        mapContext.drawImage(canvas, 0, 0);
+      }
+    });
+    const pdf = new jsPDF('landscape', undefined, format);
+    pdf.addImage(mapCanvas.toDataURL('image/jpeg'), 'JPEG', 0, 0, dim[0], dim[1]);
+    pdf.save('map.pdf');
+    // Reset original map size
+    map.setSize(size);
+    map.getView().setResolution(viewResolution);
+    exportButton.disabled = false;
+    document.body.style.cursor = 'auto';
   });
 
-  map.setSize([width, height]);
-  map.getView().fit(extent);
-  map.renderSync();
+  // Set print size
+  const printSize = [width, height];
+  map.setSize(printSize);
+  const scaling = Math.min(width / size[0], height / size[1]);
+  map.getView().setResolution(viewResolution / scaling);
 
 }, false);

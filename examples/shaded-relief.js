@@ -1,17 +1,13 @@
-// NOCOMPILE
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import ImageLayer from '../src/ol/layer/Image.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import OSM from '../src/ol/source/OSM.js';
-import RasterSource from '../src/ol/source/Raster.js';
-import XYZ from '../src/ol/source/XYZ.js';
+import {Image as ImageLayer, Tile as TileLayer} from '../src/ol/layer.js';
+import {OSM, Raster, XYZ} from '../src/ol/source.js';
 
 
 /**
  * Generates a shaded relief image given elevation data.  Uses a 3x3
  * neighborhood for determining slope and aspect.
- * @param {Array.<ImageData>} inputs Array of input images.
+ * @param {Array<ImageData>} inputs Array of input images.
  * @param {Object} data Data added in the "beforeoperations" event.
  * @return {ImageData} Output image.
  */
@@ -104,11 +100,10 @@ function shade(inputs, data) {
 
 const elevation = new XYZ({
   url: 'https://{a-d}.tiles.mapbox.com/v3/aj.sf-dem/{z}/{x}/{y}.png',
-  crossOrigin: 'anonymous',
-  transition: 0
+  crossOrigin: 'anonymous'
 });
 
-const raster = new RasterSource({
+const raster = new Raster({
   sources: [elevation],
   operationType: 'image',
   operation: shade

@@ -1,176 +1,154 @@
 /**
  * @module ol/ImageTile
  */
-import {inherits} from './index.js';
 import Tile from './Tile.js';
 import TileState from './TileState.js';
 import {createCanvasContext2D} from './dom.js';
-import {listenOnce, unlistenByKey} from './events.js';
-import EventType from './events/EventType.js';
+import {listenImage} from './Image.js';
 
-/**
- * @constructor
- * @extends {ol.Tile}
- * @param {ol.TileCoord} tileCoord Tile coordinate.
- * @param {ol.TileState} state State.
- * @param {string} src Image source URI.
- * @param {?string} crossOrigin Cross origin.
- * @param {ol.TileLoadFunctionType} tileLoadFunction Tile load function.
- * @param {olx.TileOptions=} opt_options Tile options.
- */
-const ImageTile = function(tileCoord, state, src, crossOrigin, tileLoadFunction, opt_options) {
 
-  Tile.call(this, tileCoord, state, opt_options);
+class ImageTile extends Tile {
 
   /**
-   * @private
-   * @type {?string}
+   * @param {import("./tilecoord.js").TileCoord} tileCoord Tile coordinate.
+   * @param {TileState} state State.
+   * @param {string} src Image source URI.
+   * @param {?string} crossOrigin Cross origin.
+   * @param {import("./Tile.js").LoadFunction} tileLoadFunction Tile load function.
+   * @param {import("./Tile.js").Options=} opt_options Tile options.
    */
-  this.crossOrigin_ = crossOrigin;
+  constructor(tileCoord, state, src, crossOrigin, tileLoadFunction, opt_options) {
+
+    super(tileCoord, state, opt_options);
+
+    /**
+     * @private
+     * @type {?string}
+     */
+    this.crossOrigin_ = crossOrigin;
+
+    /**
+     * Image URI
+     *
+     * @private
+     * @type {string}
+     */
+    this.src_ = src;
+
+    /**
+     * @private
+     * @type {HTMLImageElement|HTMLCanvasElement}
+     */
+    this.image_ = new Image();
+    if (crossOrigin !== null) {
+      this.image_.crossOrigin = crossOrigin;
+    }
+
+    /**
+     * @private
+     * @type {?function():void}
+     */
+    this.unlisten_ = null;
+
+    /**
+     * @private
+     * @type {import("./Tile.js").LoadFunction}
+     */
+    this.tileLoadFunction_ = tileLoadFunction;
+
+  }
 
   /**
-   * Image URI
+   * Get the HTML image element for this tile (may be a Canvas, Image, or Video).
+   * @return {HTMLCanvasElement|HTMLImageElement|HTMLVideoElement} Image.
+   * @api
+   */
+  getImage() {
+    return this.image_;
+  }
+
+  /**
+   * @inheritDoc
+   */
+  getKey() {
+    return this.src_;
+  }
+
+  /**
+   * Tracks loading or read errors.
    *
    * @private
-   * @type {string}
    */
-  this.src_ = src;
-
-  /**
-   * @private
-   * @type {Image|HTMLCanvasElement}
-   */
-  this.image_ = new Image();
-  if (crossOrigin !== null) {
-    this.image_.crossOrigin = crossOrigin;
-  }
-
-  /**
-   * @private
-   * @type {Array.<ol.EventsKey>}
-   */
-  this.imageListenerKeys_ = null;
-
-  /**
-   * @private
-   * @type {ol.TileLoadFunctionType}
-   */
-  this.tileLoadFunction_ = tileLoadFunction;
-
-};
-
-inherits(ImageTile, Tile);
-
-
-/**
- * @inheritDoc
- */
-ImageTile.prototype.disposeInternal = function() {
-  if (this.state == TileState.LOADING) {
+  handleImageError_() {
+    this.state = TileState.ERROR;
     this.unlistenImage_();
-    this.image_ = ImageTile.getBlankImage();
+    this.image_ = getBlankImage();
+    this.changed();
   }
-  if (this.interimTile) {
-    this.interimTile.dispose();
+
+  /**
+   * Tracks successful image load.
+   *
+   * @private
+   */
+  handleImageLoad_() {
+    const image = /** @type {HTMLImageElement} */ (this.image_);
+    if (image.naturalWidth && image.naturalHeight) {
+      this.state = TileState.LOADED;
+    } else {
+      this.state = TileState.EMPTY;
+    }
+    this.unlistenImage_();
+    this.changed();
   }
-  this.state = TileState.ABORT;
-  this.changed();
-  Tile.prototype.disposeInternal.call(this);
-};
 
-
-/**
- * Get the HTML image element for this tile (may be a Canvas, Image, or Video).
- * @return {HTMLCanvasElement|HTMLImageElement|HTMLVideoElement} Image.
- * @api
- */
-ImageTile.prototype.getImage = function() {
-  return this.image_;
-};
-
-
-/**
- * @inheritDoc
- */
-ImageTile.prototype.getKey = function() {
-  return this.src_;
-};
-
-
-/**
- * Tracks loading or read errors.
- *
- * @private
- */
-ImageTile.prototype.handleImageError_ = function() {
-  this.state = TileState.ERROR;
-  this.unlistenImage_();
-  this.image_ = ImageTile.getBlankImage();
-  this.changed();
-};
-
-
-/**
- * Tracks successful image load.
- *
- * @private
- */
-ImageTile.prototype.handleImageLoad_ = function() {
-  if (this.image_.naturalWidth && this.image_.naturalHeight) {
-    this.state = TileState.LOADED;
-  } else {
-    this.state = TileState.EMPTY;
-  }
-  this.unlistenImage_();
-  this.changed();
-};
-
-
-/**
- * @inheritDoc
- * @api
- */
-ImageTile.prototype.load = function() {
-  if (this.state == TileState.ERROR) {
-    this.state = TileState.IDLE;
-    this.image_ = new Image();
-    if (this.crossOrigin_ !== null) {
-      this.image_.crossOrigin = this.crossOrigin_;
+  /**
+   * @inheritDoc
+   * @api
+   */
+  load() {
+    if (this.state == TileState.ERROR) {
+      this.state = TileState.IDLE;
+      this.image_ = new Image();
+      if (this.crossOrigin_ !== null) {
+        this.image_.crossOrigin = this.crossOrigin_;
+      }
+    }
+    if (this.state == TileState.IDLE) {
+      this.state = TileState.LOADING;
+      this.changed();
+      this.tileLoadFunction_(this, this.src_);
+      this.unlisten_ = listenImage(
+        this.image_,
+        this.handleImageLoad_.bind(this),
+        this.handleImageError_.bind(this)
+      );
     }
   }
-  if (this.state == TileState.IDLE) {
-    this.state = TileState.LOADING;
-    this.changed();
-    this.imageListenerKeys_ = [
-      listenOnce(this.image_, EventType.ERROR,
-        this.handleImageError_, this),
-      listenOnce(this.image_, EventType.LOAD,
-        this.handleImageLoad_, this)
-    ];
-    this.tileLoadFunction_(this, this.src_);
+
+  /**
+   * Discards event handlers which listen for load completion or errors.
+   *
+   * @private
+   */
+  unlistenImage_() {
+    if (this.unlisten_) {
+      this.unlisten_();
+      this.unlisten_ = null;
+    }
   }
-};
-
-
-/**
- * Discards event handlers which listen for load completion or errors.
- *
- * @private
- */
-ImageTile.prototype.unlistenImage_ = function() {
-  this.imageListenerKeys_.forEach(unlistenByKey);
-  this.imageListenerKeys_ = null;
-};
+}
 
 
 /**
  * Get a 1-pixel blank image.
  * @return {HTMLCanvasElement} Blank image.
  */
-ImageTile.getBlankImage = function() {
+function getBlankImage() {
   const ctx = createCanvasContext2D(1, 1);
   ctx.fillStyle = 'rgba(0,0,0,0)';
   ctx.fillRect(0, 0, 1, 1);
   return ctx.canvas;
-};
+}
+
 export default ImageTile;

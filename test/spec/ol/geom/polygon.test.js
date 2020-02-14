@@ -1,4 +1,4 @@
-import * as _ol_extent_ from '../../../../src/ol/extent.js';
+import {isEmpty, boundingExtent} from '../../../../src/ol/extent.js';
 import Circle from '../../../../src/ol/geom/Circle.js';
 import LinearRing from '../../../../src/ol/geom/LinearRing.js';
 import Polygon, {fromCircle, fromExtent} from '../../../../src/ol/geom/Polygon.js';
@@ -6,10 +6,10 @@ import Polygon, {fromCircle, fromExtent} from '../../../../src/ol/geom/Polygon.j
 
 describe('ol/geom/Polygon', function() {
 
-  it('can be constructed with a null geometry', function() {
+  it('cannot be constructed with a null geometry', function() {
     expect(function() {
       return new Polygon(null);
-    }).not.to.throwException();
+    }).to.throwException();
   });
 
   describe('construct empty', function() {
@@ -28,7 +28,7 @@ describe('ol/geom/Polygon', function() {
     });
 
     it('has an empty extent', function() {
-      expect(_ol_extent_.isEmpty(polygon.getExtent())).to.be(true);
+      expect(isEmpty(polygon.getExtent())).to.be(true);
     });
 
     it('has empty flat coordinates', function() {
@@ -221,25 +221,25 @@ describe('ol/geom/Polygon', function() {
 
       it('does not intersect outside extent', function() {
         expect(polygon.intersectsExtent(
-          _ol_extent_.boundingExtent([outsideOuter]))).to.be(false);
+          boundingExtent([outsideOuter]))).to.be(false);
       });
 
       it('does intersect inside extent', function() {
         expect(polygon.intersectsExtent(
-          _ol_extent_.boundingExtent([inside]))).to.be(true);
+          boundingExtent([inside]))).to.be(true);
       });
 
       it('does intersect boundary extent', function() {
         const firstMidX = (outerRing[0][0] + outerRing[1][0]) / 2;
         const firstMidY = (outerRing[0][1] + outerRing[1][1]) / 2;
 
-        expect(polygon.intersectsExtent(_ol_extent_.boundingExtent([[firstMidX,
+        expect(polygon.intersectsExtent(boundingExtent([[firstMidX,
           firstMidY]]))).to.be(true);
       });
 
       it('does not intersect extent fully contained by inner ring', function() {
         expect(polygon.intersectsExtent(
-          _ol_extent_.boundingExtent([insideInner]))).to.be(false);
+          boundingExtent([insideInner]))).to.be(false);
       });
 
     });
@@ -320,25 +320,25 @@ describe('ol/geom/Polygon', function() {
 
       it('does not intersect outside extent', function() {
         expect(polygon.intersectsExtent(
-          _ol_extent_.boundingExtent([outsideOuter]))).to.be(false);
+          boundingExtent([outsideOuter]))).to.be(false);
       });
 
       it('does intersect inside extent', function() {
         expect(polygon.intersectsExtent(
-          _ol_extent_.boundingExtent([inside]))).to.be(true);
+          boundingExtent([inside]))).to.be(true);
       });
 
       it('does intersect boundary extent', function() {
         const firstMidX = (outerRing[0][0] + outerRing[1][0]) / 2;
         const firstMidY = (outerRing[0][1] + outerRing[1][1]) / 2;
 
-        expect(polygon.intersectsExtent(_ol_extent_.boundingExtent([[firstMidX,
+        expect(polygon.intersectsExtent(boundingExtent([[firstMidX,
           firstMidY]]))).to.be(true);
       });
 
       it('does not intersect extent fully contained by inner ring', function() {
         expect(polygon.intersectsExtent(
-          _ol_extent_.boundingExtent([insideInner]))).to.be(false);
+          boundingExtent([insideInner]))).to.be(false);
       });
 
     });
@@ -427,27 +427,27 @@ describe('ol/geom/Polygon', function() {
 
       it('does not intersect outside extent', function() {
         expect(polygon.intersectsExtent(
-          _ol_extent_.boundingExtent([outsideOuter]))).to.be(false);
+          boundingExtent([outsideOuter]))).to.be(false);
       });
 
       it('does intersect inside extent', function() {
         expect(polygon.intersectsExtent(
-          _ol_extent_.boundingExtent([inside]))).to.be(true);
+          boundingExtent([inside]))).to.be(true);
       });
 
       it('does intersect boundary extent', function() {
         const firstMidX = (outerRing[0][0] + outerRing[1][0]) / 2;
         const firstMidY = (outerRing[0][1] + outerRing[1][1]) / 2;
 
-        expect(polygon.intersectsExtent(_ol_extent_.boundingExtent([[firstMidX,
+        expect(polygon.intersectsExtent(boundingExtent([[firstMidX,
           firstMidY]]))).to.be(true);
       });
 
       it('does not intersect extent fully contained by inner ring', function() {
         expect(polygon.intersectsExtent(
-          _ol_extent_.boundingExtent([insideInner1]))).to.be(false);
+          boundingExtent([insideInner1]))).to.be(false);
         expect(polygon.intersectsExtent(
-          _ol_extent_.boundingExtent([insideInner2]))).to.be(false);
+          boundingExtent([insideInner2]))).to.be(false);
       });
 
     });
@@ -494,15 +494,6 @@ describe('ol/geom/Polygon', function() {
         expect(simplifiedGeometry).to.be.an(Polygon);
         expect(simplifiedGeometry.getCoordinates()).to.eql(
           [[[3, 0], [0, 3], [0, 6], [6, 6], [3, 3]]]);
-      });
-
-      it('caches multiple simplified geometries', function() {
-        const simplifiedGeometry1 = polygon.getSimplifiedGeometry(4);
-        const simplifiedGeometry2 = polygon.getSimplifiedGeometry(9);
-        const simplifiedGeometry3 = polygon.getSimplifiedGeometry(4);
-        const simplifiedGeometry4 = polygon.getSimplifiedGeometry(9);
-        expect(simplifiedGeometry1).to.be(simplifiedGeometry3);
-        expect(simplifiedGeometry2).to.be(simplifiedGeometry4);
       });
 
     });
@@ -604,6 +595,14 @@ describe('ol/geom/Polygon', function() {
       expect(coordinates[4]).to.eql(coordinates[0]);
       expect(coordinates[0][0]).to.roughlyEqual(0, 1e-9);
       expect(coordinates[0][1]).to.roughlyEqual(1, 1e-9);
+    });
+
+    it('creates a regular polygon, maintaining ZM values', () => {
+      const circle = new Circle([0, 0, 1, 1], 1, 'XYZM');
+      const polygon = fromCircle(circle);
+      const coordinates = polygon.getLinearRing(0).getCoordinates();
+      expect(coordinates[0][2]).to.eql(1);
+      expect(coordinates[0][3]).to.eql(1);
     });
   });
 

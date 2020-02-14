@@ -5,7 +5,7 @@ import Layer from '../../../../src/ol/layer/Layer.js';
 import TileLayer from '../../../../src/ol/layer/Tile.js';
 import LayerRenderer from '../../../../src/ol/renderer/Layer.js';
 import XYZ from '../../../../src/ol/source/XYZ.js';
-import _ol_tilecoord_ from '../../../../src/ol/tilecoord.js';
+import {fromKey} from '../../../../src/ol/tilecoord.js';
 
 
 describe('ol.renderer.Layer', function() {
@@ -40,7 +40,7 @@ describe('ol.renderer.Layer', function() {
 
       it('registers a listener', function() {
         renderer.loadImage(image);
-        const listeners = image.getListeners(eventType, false);
+        const listeners = image.listeners_[eventType];
         expect(listeners).to.have.length(1);
       });
 
@@ -76,7 +76,7 @@ describe('ol.renderer.Layer', function() {
 
       it('does not register a new listener', function() {
         renderer.loadImage(image);
-        const listeners = image.getListeners(eventType, false);
+        const listeners = image.listeners_[eventType];
         expect(listeners).to.have.length(1);
       });
 
@@ -100,6 +100,7 @@ describe('ol.renderer.Layer', function() {
 
       view = new View({
         center: [0, 0],
+        multiWorld: true,
         zoom: 0
       });
 
@@ -129,13 +130,13 @@ describe('ol.renderer.Layer', function() {
     it('accesses tiles from current zoom level last', function(done) {
       // expect most recent tile in the cache to be from zoom level 0
       const key = source.tileCache.peekFirstKey();
-      const tileCoord = _ol_tilecoord_.fromKey(key);
+      const tileCoord = fromKey(key);
       expect(tileCoord[0]).to.be(0);
 
       map.once('moveend', function() {
         // expect most recent tile in the cache to be from zoom level 4
         const key = source.tileCache.peekFirstKey();
-        const tileCoord = _ol_tilecoord_.fromKey(key);
+        const tileCoord = fromKey(key);
         expect(tileCoord[0]).to.be(4);
         done();
       });

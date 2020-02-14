@@ -1,7 +1,6 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import {defaults as defaultControls} from '../src/ol/control.js';
-import * as _ol_extent_ from '../src/ol/extent.js';
+import {getBottomLeft, getTopRight} from '../src/ol/extent.js';
 import TileLayer from '../src/ol/layer/Tile.js';
 import {toLonLat} from '../src/ol/proj.js';
 import OSM from '../src/ol/source/OSM.js';
@@ -14,11 +13,6 @@ const map = new Map({
     })
   ],
   target: 'map',
-  controls: defaultControls({
-    attributionOptions: {
-      collapsible: false
-    }
-  }),
   view: new View({
     center: [0, 0],
     zoom: 2
@@ -37,8 +31,8 @@ function wrapLon(value) {
 function onMoveEnd(evt) {
   const map = evt.map;
   const extent = map.getView().calculateExtent(map.getSize());
-  const bottomLeft = toLonLat(_ol_extent_.getBottomLeft(extent));
-  const topRight = toLonLat(_ol_extent_.getTopRight(extent));
+  const bottomLeft = toLonLat(getBottomLeft(extent));
+  const topRight = toLonLat(getTopRight(extent));
   display('left', wrapLon(bottomLeft[0]));
   display('bottom', bottomLeft[1]);
   display('right', wrapLon(topRight[0]));

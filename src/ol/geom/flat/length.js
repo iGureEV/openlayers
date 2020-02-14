@@ -1,17 +1,16 @@
 /**
  * @module ol/geom/flat/length
  */
-const _ol_geom_flat_length_ = {};
 
 
 /**
- * @param {Array.<number>} flatCoordinates Flat coordinates.
+ * @param {Array<number>} flatCoordinates Flat coordinates.
  * @param {number} offset Offset.
  * @param {number} end End.
  * @param {number} stride Stride.
  * @return {number} Length.
  */
-_ol_geom_flat_length_.lineString = function(flatCoordinates, offset, end, stride) {
+export function lineStringLength(flatCoordinates, offset, end, stride) {
   let x1 = flatCoordinates[offset];
   let y1 = flatCoordinates[offset + 1];
   let length = 0;
@@ -23,21 +22,20 @@ _ol_geom_flat_length_.lineString = function(flatCoordinates, offset, end, stride
     y1 = y2;
   }
   return length;
-};
+}
 
 
 /**
- * @param {Array.<number>} flatCoordinates Flat coordinates.
+ * @param {Array<number>} flatCoordinates Flat coordinates.
  * @param {number} offset Offset.
  * @param {number} end End.
  * @param {number} stride Stride.
  * @return {number} Perimeter.
  */
-_ol_geom_flat_length_.linearRing = function(flatCoordinates, offset, end, stride) {
-  let perimeter = _ol_geom_flat_length_.lineString(flatCoordinates, offset, end, stride);
+export function linearRingLength(flatCoordinates, offset, end, stride) {
+  let perimeter = lineStringLength(flatCoordinates, offset, end, stride);
   const dx = flatCoordinates[end - stride] - flatCoordinates[offset];
   const dy = flatCoordinates[end - stride + 1] - flatCoordinates[offset + 1];
   perimeter += Math.sqrt(dx * dx + dy * dy);
   return perimeter;
-};
-export default _ol_geom_flat_length_;
+}

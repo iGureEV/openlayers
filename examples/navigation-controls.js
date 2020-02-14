@@ -1,17 +1,12 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import {defaults as defaultControls} from '../src/ol/control.js';
-import ZoomToExtent from '../src/ol/control/ZoomToExtent.js';
+import {defaults as defaultControls, ZoomToExtent} from '../src/ol/control.js';
 import TileLayer from '../src/ol/layer/Tile.js';
 import OSM from '../src/ol/source/OSM.js';
 
 
 const map = new Map({
-  controls: defaultControls({
-    attributionOptions: {
-      collapsible: false
-    }
-  }).extend([
+  controls: defaultControls().extend([
     new ZoomToExtent({
       extent: [
         813079.7791264898, 5929220.284081122,

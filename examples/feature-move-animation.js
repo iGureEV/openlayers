@@ -3,15 +3,11 @@ import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
 import Polyline from '../src/ol/format/Polyline.js';
 import Point from '../src/ol/geom/Point.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import VectorLayer from '../src/ol/layer/Vector.js';
-import BingMaps from '../src/ol/source/BingMaps.js';
+import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
+import XYZ from '../src/ol/source/XYZ.js';
 import VectorSource from '../src/ol/source/Vector.js';
-import CircleStyle from '../src/ol/style/Circle.js';
-import Fill from '../src/ol/style/Fill.js';
-import Icon from '../src/ol/style/Icon.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
+import {Circle as CircleStyle, Fill, Icon, Stroke, Style} from '../src/ol/style.js';
+import {getVectorContext} from '../src/ol/render.js';
 
 // This long string is placed here due to jsFiddle limitations.
 // It is usually loaded with AJAX.
@@ -57,7 +53,7 @@ const polyline = [
   '~@ym@yjA??a@cFd@kBrCgDbAUnAcBhAyAdk@et@??kF}D??OL'
 ].join('');
 
-const route = /** @type {ol.geom.LineString} */ (new Polyline({
+const route = /** @type {import("../src/ol/geom/LineString.js").default} */ (new Polyline({
   factor: 1e6
 }).readGeometry(polyline, {
   dataProjection: 'EPSG:4326',
@@ -71,10 +67,10 @@ const routeFeature = new Feature({
   type: 'route',
   geometry: route
 });
-const geoMarker = new Feature({
+const geoMarker = /** @type Feature<import("../src/ol/geom/Point").default> */(new Feature({
   type: 'geoMarker',
   geometry: new Point(routeCoords[0])
-});
+}));
 const startMarker = new Feature({
   type: 'icon',
   geometry: new Point(routeCoords[0])
@@ -99,7 +95,6 @@ const styles = {
   'geoMarker': new Style({
     image: new CircleStyle({
       radius: 7,
-      snapToPixel: false,
       fill: new Fill({color: 'black'}),
       stroke: new Stroke({
         color: 'white', width: 2
@@ -126,10 +121,13 @@ const vectorLayer = new VectorLayer({
   }
 });
 
+const key = 'get_your_own_D6rA4zTHduk6KOKTXzGB';
+const attributions = '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> ' +
+  '<a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>';
+
 const center = [-5639523.95, -3501274.52];
 const map = new Map({
   target: document.getElementById('map'),
-  loadTilesWhileAnimating: true,
   view: new View({
     center: center,
     zoom: 10,
@@ -138,9 +136,10 @@ const map = new Map({
   }),
   layers: [
     new TileLayer({
-      source: new BingMaps({
-        imagerySet: 'AerialWithLabels',
-        key: 'As1HiMj1PvLPlqc_gtM7AqZfBL8ZL3VrjaS3zIb22Uvb9WKhuJObROC-qUpa81U5'
+      source: new XYZ({
+        attributions: attributions,
+        url: 'https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=' + key,
+        tileSize: 512
       })
     }),
     vectorLayer
@@ -148,7 +147,7 @@ const map = new Map({
 });
 
 const moveFeature = function(event) {
-  const vectorContext = event.vectorContext;
+  const vectorContext = getVectorContext(event);
   const frameState = event.frameState;
 
   if (animating) {
@@ -166,7 +165,7 @@ const moveFeature = function(event) {
     const feature = new Feature(currentPoint);
     vectorContext.drawFeature(feature, styles.geoMarker);
   }
-  // tell OpenLayers to continue the postcompose animation
+  // tell OpenLayers to continue the postrender animation
   map.render();
 };
 
@@ -182,7 +181,7 @@ function startAnimation() {
     geoMarker.setStyle(null);
     // just in case you pan somewhere else
     map.getView().setCenter(center);
-    map.on('postcompose', moveFeature);
+    vectorLayer.on('postrender', moveFeature);
     map.render();
   }
 }
@@ -197,10 +196,10 @@ function stopAnimation(ended) {
 
   // if animation cancelled set the marker at the beginning
   const coord = ended ? routeCoords[routeLength - 1] : routeCoords[0];
-  /** @type {ol.geom.Point} */ (geoMarker.getGeometry())
-    .setCoordinates(coord);
+  const geometry = geoMarker.getGeometry();
+  geometry.setCoordinates(coord);
   //remove listener
-  map.un('postcompose', moveFeature);
+  vectorLayer.un('postrender', moveFeature);
 }
 
 startButton.addEventListener('click', startAnimation, false);

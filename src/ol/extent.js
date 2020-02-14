@@ -7,10 +7,16 @@ import Relationship from './extent/Relationship.js';
 
 
 /**
+ * An array of numbers representing an extent: `[minx, miny, maxx, maxy]`.
+ * @typedef {Array<number>} Extent
+ * @api
+ */
+
+/**
  * Build an extent that includes all given coordinates.
  *
- * @param {Array.<ol.Coordinate>} coordinates Coordinates.
- * @return {ol.Extent} Bounding extent.
+ * @param {Array<import("./coordinate.js").Coordinate>} coordinates Coordinates.
+ * @return {Extent} Bounding extent.
  * @api
  */
 export function boundingExtent(coordinates) {
@@ -23,11 +29,11 @@ export function boundingExtent(coordinates) {
 
 
 /**
- * @param {Array.<number>} xs Xs.
- * @param {Array.<number>} ys Ys.
- * @param {ol.Extent=} opt_extent Destination extent.
+ * @param {Array<number>} xs Xs.
+ * @param {Array<number>} ys Ys.
+ * @param {Extent=} opt_extent Destination extent.
  * @private
- * @return {ol.Extent} Extent.
+ * @return {Extent} Extent.
  */
 function _boundingExtentXYs(xs, ys, opt_extent) {
   const minX = Math.min.apply(null, xs);
@@ -40,10 +46,10 @@ function _boundingExtentXYs(xs, ys, opt_extent) {
 
 /**
  * Return extent increased by the provided value.
- * @param {ol.Extent} extent Extent.
+ * @param {Extent} extent Extent.
  * @param {number} value The amount by which the extent should be buffered.
- * @param {ol.Extent=} opt_extent Extent.
- * @return {ol.Extent} Extent.
+ * @param {Extent=} opt_extent Extent.
+ * @return {Extent} Extent.
  * @api
  */
 export function buffer(extent, value, opt_extent) {
@@ -67,9 +73,9 @@ export function buffer(extent, value, opt_extent) {
 /**
  * Creates a clone of an extent.
  *
- * @param {ol.Extent} extent Extent to clone.
- * @param {ol.Extent=} opt_extent Extent.
- * @return {ol.Extent} The clone.
+ * @param {Extent} extent Extent to clone.
+ * @param {Extent=} opt_extent Extent.
+ * @return {Extent} The clone.
  */
 export function clone(extent, opt_extent) {
   if (opt_extent) {
@@ -85,7 +91,7 @@ export function clone(extent, opt_extent) {
 
 
 /**
- * @param {ol.Extent} extent Extent.
+ * @param {Extent} extent Extent.
  * @param {number} x X.
  * @param {number} y Y.
  * @return {number} Closest squared distance.
@@ -113,8 +119,8 @@ export function closestSquaredDistanceXY(extent, x, y) {
 /**
  * Check if the passed coordinate is contained or on the edge of the extent.
  *
- * @param {ol.Extent} extent Extent.
- * @param {ol.Coordinate} coordinate Coordinate.
+ * @param {Extent} extent Extent.
+ * @param {import("./coordinate.js").Coordinate} coordinate Coordinate.
  * @return {boolean} The coordinate is contained in the extent.
  * @api
  */
@@ -129,8 +135,8 @@ export function containsCoordinate(extent, coordinate) {
  * An extent is deemed contained if it lies completely within the other extent,
  * including if they share one or more edges.
  *
- * @param {ol.Extent} extent1 Extent 1.
- * @param {ol.Extent} extent2 Extent 2.
+ * @param {Extent} extent1 Extent 1.
+ * @param {Extent} extent2 Extent 2.
  * @return {boolean} The second extent is contained by or on the edge of the
  *     first.
  * @api
@@ -144,7 +150,7 @@ export function containsExtent(extent1, extent2) {
 /**
  * Check if the passed coordinate is contained or on the edge of the extent.
  *
- * @param {ol.Extent} extent Extent.
+ * @param {Extent} extent Extent.
  * @param {number} x X coordinate.
  * @param {number} y Y coordinate.
  * @return {boolean} The x, y values are contained in the extent.
@@ -157,10 +163,10 @@ export function containsXY(extent, x, y) {
 
 /**
  * Get the relationship between a coordinate and extent.
- * @param {ol.Extent} extent The extent.
- * @param {ol.Coordinate} coordinate The coordinate.
- * @return {number} The relationship (bitwise compare with
- *     ol.extent.Relationship).
+ * @param {Extent} extent The extent.
+ * @param {import("./coordinate.js").Coordinate} coordinate The coordinate.
+ * @return {Relationship} The relationship (bitwise compare with
+ *     import("./extent/Relationship.js").Relationship).
  */
 export function coordinateRelationship(extent, coordinate) {
   const minX = extent[0];
@@ -189,7 +195,7 @@ export function coordinateRelationship(extent, coordinate) {
 
 /**
  * Create an empty extent.
- * @return {ol.Extent} Empty extent.
+ * @return {Extent} Empty extent.
  * @api
  */
 export function createEmpty() {
@@ -203,8 +209,8 @@ export function createEmpty() {
  * @param {number} minY Minimum Y.
  * @param {number} maxX Maximum X.
  * @param {number} maxY Maximum Y.
- * @param {ol.Extent=} opt_extent Destination extent.
- * @return {ol.Extent} Extent.
+ * @param {Extent=} opt_extent Destination extent.
+ * @return {Extent} Extent.
  */
 export function createOrUpdate(minX, minY, maxX, maxY, opt_extent) {
   if (opt_extent) {
@@ -221,8 +227,8 @@ export function createOrUpdate(minX, minY, maxX, maxY, opt_extent) {
 
 /**
  * Create a new empty extent or make the provided one empty.
- * @param {ol.Extent=} opt_extent Extent.
- * @return {ol.Extent} Extent.
+ * @param {Extent=} opt_extent Extent.
+ * @return {Extent} Extent.
  */
 export function createOrUpdateEmpty(opt_extent) {
   return createOrUpdate(
@@ -231,9 +237,9 @@ export function createOrUpdateEmpty(opt_extent) {
 
 
 /**
- * @param {ol.Coordinate} coordinate Coordinate.
- * @param {ol.Extent=} opt_extent Extent.
- * @return {ol.Extent} Extent.
+ * @param {import("./coordinate.js").Coordinate} coordinate Coordinate.
+ * @param {Extent=} opt_extent Extent.
+ * @return {Extent} Extent.
  */
 export function createOrUpdateFromCoordinate(coordinate, opt_extent) {
   const x = coordinate[0];
@@ -243,9 +249,9 @@ export function createOrUpdateFromCoordinate(coordinate, opt_extent) {
 
 
 /**
- * @param {Array.<ol.Coordinate>} coordinates Coordinates.
- * @param {ol.Extent=} opt_extent Extent.
- * @return {ol.Extent} Extent.
+ * @param {Array<import("./coordinate.js").Coordinate>} coordinates Coordinates.
+ * @param {Extent=} opt_extent Extent.
+ * @return {Extent} Extent.
  */
 export function createOrUpdateFromCoordinates(coordinates, opt_extent) {
   const extent = createOrUpdateEmpty(opt_extent);
@@ -254,12 +260,12 @@ export function createOrUpdateFromCoordinates(coordinates, opt_extent) {
 
 
 /**
- * @param {Array.<number>} flatCoordinates Flat coordinates.
+ * @param {Array<number>} flatCoordinates Flat coordinates.
  * @param {number} offset Offset.
  * @param {number} end End.
  * @param {number} stride Stride.
- * @param {ol.Extent=} opt_extent Extent.
- * @return {ol.Extent} Extent.
+ * @param {Extent=} opt_extent Extent.
+ * @return {Extent} Extent.
  */
 export function createOrUpdateFromFlatCoordinates(flatCoordinates, offset, end, stride, opt_extent) {
   const extent = createOrUpdateEmpty(opt_extent);
@@ -267,9 +273,9 @@ export function createOrUpdateFromFlatCoordinates(flatCoordinates, offset, end, 
 }
 
 /**
- * @param {Array.<Array.<ol.Coordinate>>} rings Rings.
- * @param {ol.Extent=} opt_extent Extent.
- * @return {ol.Extent} Extent.
+ * @param {Array<Array<import("./coordinate.js").Coordinate>>} rings Rings.
+ * @param {Extent=} opt_extent Extent.
+ * @return {Extent} Extent.
  */
 export function createOrUpdateFromRings(rings, opt_extent) {
   const extent = createOrUpdateEmpty(opt_extent);
@@ -279,8 +285,8 @@ export function createOrUpdateFromRings(rings, opt_extent) {
 
 /**
  * Determine if two extents are equivalent.
- * @param {ol.Extent} extent1 Extent 1.
- * @param {ol.Extent} extent2 Extent 2.
+ * @param {Extent} extent1 Extent 1.
+ * @param {Extent} extent2 Extent 2.
  * @return {boolean} The two extents are equivalent.
  * @api
  */
@@ -292,9 +298,9 @@ export function equals(extent1, extent2) {
 
 /**
  * Modify an extent to include another extent.
- * @param {ol.Extent} extent1 The extent to be modified.
- * @param {ol.Extent} extent2 The extent that will be included in the first.
- * @return {ol.Extent} A reference to the first (extended) extent.
+ * @param {Extent} extent1 The extent to be modified.
+ * @param {Extent} extent2 The extent that will be included in the first.
+ * @return {Extent} A reference to the first (extended) extent.
  * @api
  */
 export function extend(extent1, extent2) {
@@ -315,8 +321,8 @@ export function extend(extent1, extent2) {
 
 
 /**
- * @param {ol.Extent} extent Extent.
- * @param {ol.Coordinate} coordinate Coordinate.
+ * @param {Extent} extent Extent.
+ * @param {import("./coordinate.js").Coordinate} coordinate Coordinate.
  */
 export function extendCoordinate(extent, coordinate) {
   if (coordinate[0] < extent[0]) {
@@ -335,9 +341,9 @@ export function extendCoordinate(extent, coordinate) {
 
 
 /**
- * @param {ol.Extent} extent Extent.
- * @param {Array.<ol.Coordinate>} coordinates Coordinates.
- * @return {ol.Extent} Extent.
+ * @param {Extent} extent Extent.
+ * @param {Array<import("./coordinate.js").Coordinate>} coordinates Coordinates.
+ * @return {Extent} Extent.
  */
 export function extendCoordinates(extent, coordinates) {
   for (let i = 0, ii = coordinates.length; i < ii; ++i) {
@@ -348,12 +354,12 @@ export function extendCoordinates(extent, coordinates) {
 
 
 /**
- * @param {ol.Extent} extent Extent.
- * @param {Array.<number>} flatCoordinates Flat coordinates.
+ * @param {Extent} extent Extent.
+ * @param {Array<number>} flatCoordinates Flat coordinates.
  * @param {number} offset Offset.
  * @param {number} end End.
  * @param {number} stride Stride.
- * @return {ol.Extent} Extent.
+ * @return {Extent} Extent.
  */
 export function extendFlatCoordinates(extent, flatCoordinates, offset, end, stride) {
   for (; offset < end; offset += stride) {
@@ -364,9 +370,9 @@ export function extendFlatCoordinates(extent, flatCoordinates, offset, end, stri
 
 
 /**
- * @param {ol.Extent} extent Extent.
- * @param {Array.<Array.<ol.Coordinate>>} rings Rings.
- * @return {ol.Extent} Extent.
+ * @param {Extent} extent Extent.
+ * @param {Array<Array<import("./coordinate.js").Coordinate>>} rings Rings.
+ * @return {Extent} Extent.
  */
 export function extendRings(extent, rings) {
   for (let i = 0, ii = rings.length; i < ii; ++i) {
@@ -377,7 +383,7 @@ export function extendRings(extent, rings) {
 
 
 /**
- * @param {ol.Extent} extent Extent.
+ * @param {Extent} extent Extent.
  * @param {number} x X.
  * @param {number} y Y.
  */
@@ -393,27 +399,26 @@ export function extendXY(extent, x, y) {
  * This function calls `callback` for each corner of the extent. If the
  * callback returns a truthy value the function returns that value
  * immediately. Otherwise the function returns `false`.
- * @param {ol.Extent} extent Extent.
- * @param {function(this:T, ol.Coordinate): S} callback Callback.
- * @param {T=} opt_this Value to use as `this` when executing `callback`.
+ * @param {Extent} extent Extent.
+ * @param {function(import("./coordinate.js").Coordinate): S} callback Callback.
  * @return {S|boolean} Value.
- * @template S, T
+ * @template S
  */
-export function forEachCorner(extent, callback, opt_this) {
+export function forEachCorner(extent, callback) {
   let val;
-  val = callback.call(opt_this, getBottomLeft(extent));
+  val = callback(getBottomLeft(extent));
   if (val) {
     return val;
   }
-  val = callback.call(opt_this, getBottomRight(extent));
+  val = callback(getBottomRight(extent));
   if (val) {
     return val;
   }
-  val = callback.call(opt_this, getTopRight(extent));
+  val = callback(getTopRight(extent));
   if (val) {
     return val;
   }
-  val = callback.call(opt_this, getTopLeft(extent));
+  val = callback(getTopLeft(extent));
   if (val) {
     return val;
   }
@@ -423,7 +428,7 @@ export function forEachCorner(extent, callback, opt_this) {
 
 /**
  * Get the size of an extent.
- * @param {ol.Extent} extent Extent.
+ * @param {Extent} extent Extent.
  * @return {number} Area.
  * @api
  */
@@ -438,8 +443,8 @@ export function getArea(extent) {
 
 /**
  * Get the bottom left coordinate of an extent.
- * @param {ol.Extent} extent Extent.
- * @return {ol.Coordinate} Bottom left coordinate.
+ * @param {Extent} extent Extent.
+ * @return {import("./coordinate.js").Coordinate} Bottom left coordinate.
  * @api
  */
 export function getBottomLeft(extent) {
@@ -449,8 +454,8 @@ export function getBottomLeft(extent) {
 
 /**
  * Get the bottom right coordinate of an extent.
- * @param {ol.Extent} extent Extent.
- * @return {ol.Coordinate} Bottom right coordinate.
+ * @param {Extent} extent Extent.
+ * @return {import("./coordinate.js").Coordinate} Bottom right coordinate.
  * @api
  */
 export function getBottomRight(extent) {
@@ -460,8 +465,8 @@ export function getBottomRight(extent) {
 
 /**
  * Get the center coordinate of an extent.
- * @param {ol.Extent} extent Extent.
- * @return {ol.Coordinate} Center.
+ * @param {Extent} extent Extent.
+ * @return {import("./coordinate.js").Coordinate} Center.
  * @api
  */
 export function getCenter(extent) {
@@ -471,9 +476,9 @@ export function getCenter(extent) {
 
 /**
  * Get a corner coordinate of an extent.
- * @param {ol.Extent} extent Extent.
- * @param {ol.extent.Corner} corner Corner.
- * @return {ol.Coordinate} Corner coordinate.
+ * @param {Extent} extent Extent.
+ * @param {Corner} corner Corner.
+ * @return {import("./coordinate.js").Coordinate} Corner coordinate.
  */
 export function getCorner(extent, corner) {
   let coordinate;
@@ -488,13 +493,13 @@ export function getCorner(extent, corner) {
   } else {
     assert(false, 13); // Invalid corner
   }
-  return /** @type {!ol.Coordinate} */ (coordinate);
+  return coordinate;
 }
 
 
 /**
- * @param {ol.Extent} extent1 Extent 1.
- * @param {ol.Extent} extent2 Extent 2.
+ * @param {Extent} extent1 Extent 1.
+ * @param {Extent} extent2 Extent 2.
  * @return {number} Enlarged area.
  */
 export function getEnlargedArea(extent1, extent2) {
@@ -507,12 +512,12 @@ export function getEnlargedArea(extent1, extent2) {
 
 
 /**
- * @param {ol.Coordinate} center Center.
+ * @param {import("./coordinate.js").Coordinate} center Center.
  * @param {number} resolution Resolution.
  * @param {number} rotation Rotation.
- * @param {ol.Size} size Size.
- * @param {ol.Extent=} opt_extent Destination extent.
- * @return {ol.Extent} Extent.
+ * @param {import("./size.js").Size} size Size.
+ * @param {Extent=} opt_extent Destination extent.
+ * @return {Extent} Extent.
  */
 export function getForViewAndSize(center, resolution, rotation, size, opt_extent) {
   const dx = resolution * size[0] / 2;
@@ -542,7 +547,7 @@ export function getForViewAndSize(center, resolution, rotation, size, opt_extent
 
 /**
  * Get the height of an extent.
- * @param {ol.Extent} extent Extent.
+ * @param {Extent} extent Extent.
  * @return {number} Height.
  * @api
  */
@@ -552,8 +557,8 @@ export function getHeight(extent) {
 
 
 /**
- * @param {ol.Extent} extent1 Extent 1.
- * @param {ol.Extent} extent2 Extent 2.
+ * @param {Extent} extent1 Extent 1.
+ * @param {Extent} extent2 Extent 2.
  * @return {number} Intersection area.
  */
 export function getIntersectionArea(extent1, extent2) {
@@ -564,10 +569,10 @@ export function getIntersectionArea(extent1, extent2) {
 
 /**
  * Get the intersection of two extents.
- * @param {ol.Extent} extent1 Extent 1.
- * @param {ol.Extent} extent2 Extent 2.
- * @param {ol.Extent=} opt_extent Optional extent to populate with intersection.
- * @return {ol.Extent} Intersecting extent.
+ * @param {Extent} extent1 Extent 1.
+ * @param {Extent} extent2 Extent 2.
+ * @param {Extent=} opt_extent Optional extent to populate with intersection.
+ * @return {Extent} Intersecting extent.
  * @api
  */
 export function getIntersection(extent1, extent2, opt_extent) {
@@ -601,7 +606,7 @@ export function getIntersection(extent1, extent2, opt_extent) {
 
 
 /**
- * @param {ol.Extent} extent Extent.
+ * @param {Extent} extent Extent.
  * @return {number} Margin.
  */
 export function getMargin(extent) {
@@ -611,8 +616,8 @@ export function getMargin(extent) {
 
 /**
  * Get the size (width, height) of an extent.
- * @param {ol.Extent} extent The extent.
- * @return {ol.Size} The extent size.
+ * @param {Extent} extent The extent.
+ * @return {import("./size.js").Size} The extent size.
  * @api
  */
 export function getSize(extent) {
@@ -622,8 +627,8 @@ export function getSize(extent) {
 
 /**
  * Get the top left coordinate of an extent.
- * @param {ol.Extent} extent Extent.
- * @return {ol.Coordinate} Top left coordinate.
+ * @param {Extent} extent Extent.
+ * @return {import("./coordinate.js").Coordinate} Top left coordinate.
  * @api
  */
 export function getTopLeft(extent) {
@@ -633,8 +638,8 @@ export function getTopLeft(extent) {
 
 /**
  * Get the top right coordinate of an extent.
- * @param {ol.Extent} extent Extent.
- * @return {ol.Coordinate} Top right coordinate.
+ * @param {Extent} extent Extent.
+ * @return {import("./coordinate.js").Coordinate} Top right coordinate.
  * @api
  */
 export function getTopRight(extent) {
@@ -644,7 +649,7 @@ export function getTopRight(extent) {
 
 /**
  * Get the width of an extent.
- * @param {ol.Extent} extent Extent.
+ * @param {Extent} extent Extent.
  * @return {number} Width.
  * @api
  */
@@ -655,8 +660,8 @@ export function getWidth(extent) {
 
 /**
  * Determine if one extent intersects another.
- * @param {ol.Extent} extent1 Extent 1.
- * @param {ol.Extent} extent2 Extent.
+ * @param {Extent} extent1 Extent 1.
+ * @param {Extent} extent2 Extent.
  * @return {boolean} The two extents intersect.
  * @api
  */
@@ -670,7 +675,7 @@ export function intersects(extent1, extent2) {
 
 /**
  * Determine if an extent is empty.
- * @param {ol.Extent} extent Extent.
+ * @param {Extent} extent Extent.
  * @return {boolean} Is empty.
  * @api
  */
@@ -680,9 +685,9 @@ export function isEmpty(extent) {
 
 
 /**
- * @param {ol.Extent} extent Extent.
- * @param {ol.Extent=} opt_extent Extent.
- * @return {ol.Extent} Extent.
+ * @param {Extent} extent Extent.
+ * @param {Extent=} opt_extent Extent.
+ * @return {Extent} Extent.
  */
 export function returnOrUpdate(extent, opt_extent) {
   if (opt_extent) {
@@ -698,7 +703,7 @@ export function returnOrUpdate(extent, opt_extent) {
 
 
 /**
- * @param {ol.Extent} extent Extent.
+ * @param {Extent} extent Extent.
  * @param {number} value Value.
  */
 export function scaleFromCenter(extent, value) {
@@ -714,9 +719,9 @@ export function scaleFromCenter(extent, value) {
 /**
  * Determine if the segment between two coordinates intersects (crosses,
  * touches, or is contained by) the provided extent.
- * @param {ol.Extent} extent The extent.
- * @param {ol.Coordinate} start Segment start coordinate.
- * @param {ol.Coordinate} end Segment end coordinate.
+ * @param {Extent} extent The extent.
+ * @param {import("./coordinate.js").Coordinate} start Segment start coordinate.
+ * @param {import("./coordinate.js").Coordinate} end Segment end coordinate.
  * @return {boolean} The segment intersects the extent.
  */
 export function intersectsSegment(extent, start, end) {
@@ -769,11 +774,11 @@ export function intersectsSegment(extent, start, end) {
 
 /**
  * Apply a transform function to the extent.
- * @param {ol.Extent} extent Extent.
- * @param {ol.TransformFunction} transformFn Transform function.  Called with
- * [minX, minY, maxX, maxY] extent coordinates.
- * @param {ol.Extent=} opt_extent Destination extent.
- * @return {ol.Extent} Extent.
+ * @param {Extent} extent Extent.
+ * @param {import("./proj.js").TransformFunction} transformFn Transform function.
+ * Called with `[minX, minY, maxX, maxY]` extent coordinates.
+ * @param {Extent=} opt_extent Destination extent.
+ * @return {Extent} Extent.
  * @api
  */
 export function applyTransform(extent, transformFn, opt_extent) {

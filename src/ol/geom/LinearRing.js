@@ -1,162 +1,144 @@
 /**
  * @module ol/geom/LinearRing
  */
-import {inherits} from '../index.js';
 import {closestSquaredDistanceXY} from '../extent.js';
-import GeometryLayout from '../geom/GeometryLayout.js';
-import GeometryType from '../geom/GeometryType.js';
-import SimpleGeometry from '../geom/SimpleGeometry.js';
-import {linearRing as linearRingArea} from '../geom/flat/area.js';
-import _ol_geom_flat_closest_ from '../geom/flat/closest.js';
-import _ol_geom_flat_deflate_ from '../geom/flat/deflate.js';
-import _ol_geom_flat_inflate_ from '../geom/flat/inflate.js';
-import _ol_geom_flat_simplify_ from '../geom/flat/simplify.js';
+import GeometryLayout from './GeometryLayout.js';
+import GeometryType from './GeometryType.js';
+import SimpleGeometry from './SimpleGeometry.js';
+import {linearRing as linearRingArea} from './flat/area.js';
+import {assignClosestPoint, maxSquaredDelta} from './flat/closest.js';
+import {deflateCoordinates} from './flat/deflate.js';
+import {inflateCoordinates} from './flat/inflate.js';
+import {douglasPeucker} from './flat/simplify.js';
 
 /**
  * @classdesc
  * Linear ring geometry. Only used as part of polygon; cannot be rendered
  * on its own.
  *
- * @constructor
- * @extends {ol.geom.SimpleGeometry}
- * @param {Array.<ol.Coordinate>} coordinates Coordinates.
- * @param {ol.geom.GeometryLayout=} opt_layout Layout.
  * @api
  */
-const LinearRing = function(coordinates, opt_layout) {
-
-  SimpleGeometry.call(this);
+class LinearRing extends SimpleGeometry {
 
   /**
-   * @private
-   * @type {number}
+   * @param {Array<import("../coordinate.js").Coordinate>|Array<number>} coordinates Coordinates.
+   *     For internal use, flat coordinates in combination with `opt_layout` are also accepted.
+   * @param {GeometryLayout=} opt_layout Layout.
    */
-  this.maxDelta_ = -1;
+  constructor(coordinates, opt_layout) {
+
+    super();
+
+    /**
+     * @private
+     * @type {number}
+     */
+    this.maxDelta_ = -1;
+
+    /**
+     * @private
+     * @type {number}
+     */
+    this.maxDeltaRevision_ = -1;
+
+    if (opt_layout !== undefined && !Array.isArray(coordinates[0])) {
+      this.setFlatCoordinates(opt_layout, /** @type {Array<number>} */ (coordinates));
+    } else {
+      this.setCoordinates(/** @type {Array<import("../coordinate.js").Coordinate>} */ (coordinates), opt_layout);
+    }
+
+  }
 
   /**
-   * @private
-   * @type {number}
+   * Make a complete copy of the geometry.
+   * @return {!LinearRing} Clone.
+   * @override
+   * @api
    */
-  this.maxDeltaRevision_ = -1;
-
-  this.setCoordinates(coordinates, opt_layout);
-
-};
-
-inherits(LinearRing, SimpleGeometry);
-
-
-/**
- * Make a complete copy of the geometry.
- * @return {!ol.geom.LinearRing} Clone.
- * @override
- * @api
- */
-LinearRing.prototype.clone = function() {
-  const linearRing = new LinearRing(null);
-  linearRing.setFlatCoordinates(this.layout, this.flatCoordinates.slice());
-  return linearRing;
-};
-
-
-/**
- * @inheritDoc
- */
-LinearRing.prototype.closestPointXY = function(x, y, closestPoint, minSquaredDistance) {
-  if (minSquaredDistance < closestSquaredDistanceXY(this.getExtent(), x, y)) {
-    return minSquaredDistance;
+  clone() {
+    return new LinearRing(this.flatCoordinates.slice(), this.layout);
   }
-  if (this.maxDeltaRevision_ != this.getRevision()) {
-    this.maxDelta_ = Math.sqrt(_ol_geom_flat_closest_.getMaxSquaredDelta(
-      this.flatCoordinates, 0, this.flatCoordinates.length, this.stride, 0));
-    this.maxDeltaRevision_ = this.getRevision();
+
+  /**
+   * @inheritDoc
+   */
+  closestPointXY(x, y, closestPoint, minSquaredDistance) {
+    if (minSquaredDistance < closestSquaredDistanceXY(this.getExtent(), x, y)) {
+      return minSquaredDistance;
+    }
+    if (this.maxDeltaRevision_ != this.getRevision()) {
+      this.maxDelta_ = Math.sqrt(maxSquaredDelta(
+        this.flatCoordinates, 0, this.flatCoordinates.length, this.stride, 0));
+      this.maxDeltaRevision_ = this.getRevision();
+    }
+    return assignClosestPoint(
+      this.flatCoordinates, 0, this.flatCoordinates.length, this.stride,
+      this.maxDelta_, true, x, y, closestPoint, minSquaredDistance);
   }
-  return _ol_geom_flat_closest_.getClosestPoint(
-    this.flatCoordinates, 0, this.flatCoordinates.length, this.stride,
-    this.maxDelta_, true, x, y, closestPoint, minSquaredDistance);
-};
 
+  /**
+   * Return the area of the linear ring on projected plane.
+   * @return {number} Area (on projected plane).
+   * @api
+   */
+  getArea() {
+    return linearRingArea(this.flatCoordinates, 0, this.flatCoordinates.length, this.stride);
+  }
 
-/**
- * Return the area of the linear ring on projected plane.
- * @return {number} Area (on projected plane).
- * @api
- */
-LinearRing.prototype.getArea = function() {
-  return linearRingArea(this.flatCoordinates, 0, this.flatCoordinates.length, this.stride);
-};
+  /**
+   * Return the coordinates of the linear ring.
+   * @return {Array<import("../coordinate.js").Coordinate>} Coordinates.
+   * @override
+   * @api
+   */
+  getCoordinates() {
+    return inflateCoordinates(
+      this.flatCoordinates, 0, this.flatCoordinates.length, this.stride);
+  }
 
+  /**
+   * @inheritDoc
+   */
+  getSimplifiedGeometryInternal(squaredTolerance) {
+    const simplifiedFlatCoordinates = [];
+    simplifiedFlatCoordinates.length = douglasPeucker(
+      this.flatCoordinates, 0, this.flatCoordinates.length, this.stride,
+      squaredTolerance, simplifiedFlatCoordinates, 0);
+    return new LinearRing(simplifiedFlatCoordinates, GeometryLayout.XY);
+  }
 
-/**
- * Return the coordinates of the linear ring.
- * @return {Array.<ol.Coordinate>} Coordinates.
- * @override
- * @api
- */
-LinearRing.prototype.getCoordinates = function() {
-  return _ol_geom_flat_inflate_.coordinates(
-    this.flatCoordinates, 0, this.flatCoordinates.length, this.stride);
-};
+  /**
+   * @inheritDoc
+   * @api
+   */
+  getType() {
+    return GeometryType.LINEAR_RING;
+  }
 
+  /**
+   * @inheritDoc
+   */
+  intersectsExtent(extent) {
+    return false;
+  }
 
-/**
- * @inheritDoc
- */
-LinearRing.prototype.getSimplifiedGeometryInternal = function(squaredTolerance) {
-  const simplifiedFlatCoordinates = [];
-  simplifiedFlatCoordinates.length = _ol_geom_flat_simplify_.douglasPeucker(
-    this.flatCoordinates, 0, this.flatCoordinates.length, this.stride,
-    squaredTolerance, simplifiedFlatCoordinates, 0);
-  const simplifiedLinearRing = new LinearRing(null);
-  simplifiedLinearRing.setFlatCoordinates(
-    GeometryLayout.XY, simplifiedFlatCoordinates);
-  return simplifiedLinearRing;
-};
-
-
-/**
- * @inheritDoc
- * @api
- */
-LinearRing.prototype.getType = function() {
-  return GeometryType.LINEAR_RING;
-};
-
-
-/**
- * @inheritDoc
- */
-LinearRing.prototype.intersectsExtent = function(extent) {};
-
-
-/**
- * Set the coordinates of the linear ring.
- * @param {Array.<ol.Coordinate>} coordinates Coordinates.
- * @param {ol.geom.GeometryLayout=} opt_layout Layout.
- * @override
- * @api
- */
-LinearRing.prototype.setCoordinates = function(coordinates, opt_layout) {
-  if (!coordinates) {
-    this.setFlatCoordinates(GeometryLayout.XY, null);
-  } else {
+  /**
+   * Set the coordinates of the linear ring.
+   * @param {!Array<import("../coordinate.js").Coordinate>} coordinates Coordinates.
+   * @param {GeometryLayout=} opt_layout Layout.
+   * @override
+   * @api
+   */
+  setCoordinates(coordinates, opt_layout) {
     this.setLayout(opt_layout, coordinates, 1);
     if (!this.flatCoordinates) {
       this.flatCoordinates = [];
     }
-    this.flatCoordinates.length = _ol_geom_flat_deflate_.coordinates(
+    this.flatCoordinates.length = deflateCoordinates(
       this.flatCoordinates, 0, coordinates, this.stride);
     this.changed();
   }
-};
+}
 
 
-/**
- * @param {ol.geom.GeometryLayout} layout Layout.
- * @param {Array.<number>} flatCoordinates Flat coordinates.
- */
-LinearRing.prototype.setFlatCoordinates = function(layout, flatCoordinates) {
-  this.setFlatCoordinatesInternal(layout, flatCoordinates);
-  this.changed();
-};
 export default LinearRing;

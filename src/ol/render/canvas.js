@@ -1,189 +1,284 @@
 /**
  * @module ol/render/canvas
  */
-import {getFontFamilies} from '../css.js';
+import {getFontParameters} from '../css.js';
 import {createCanvasContext2D} from '../dom.js';
 import {clear} from '../obj.js';
-import LRUCache from '../structs/LRUCache.js';
-import _ol_transform_ from '../transform.js';
-const _ol_render_canvas_ = {};
+import BaseObject from '../Object.js';
+import EventTarget from '../events/Target.js';
+
+
+/**
+ * @typedef {Object} FillState
+ * @property {import("../colorlike.js").ColorLike} fillStyle
+ */
+
+/**
+ * @typedef Label
+ * @property {number} width
+ * @property {number} height
+ * @property {Array<string|number>} contextInstructions
+ */
+
+/**
+ * @typedef {Object} FillStrokeState
+ * @property {import("../colorlike.js").ColorLike} [currentFillStyle]
+ * @property {import("../colorlike.js").ColorLike} [currentStrokeStyle]
+ * @property {CanvasLineCap} [currentLineCap]
+ * @property {Array<number>} currentLineDash
+ * @property {number} [currentLineDashOffset]
+ * @property {CanvasLineJoin} [currentLineJoin]
+ * @property {number} [currentLineWidth]
+ * @property {number} [currentMiterLimit]
+ * @property {number} [lastStroke]
+ * @property {import("../colorlike.js").ColorLike} [fillStyle]
+ * @property {import("../colorlike.js").ColorLike} [strokeStyle]
+ * @property {CanvasLineCap} [lineCap]
+ * @property {Array<number>} lineDash
+ * @property {number} [lineDashOffset]
+ * @property {CanvasLineJoin} [lineJoin]
+ * @property {number} [lineWidth]
+ * @property {number} [miterLimit]
+ */
+
+
+/**
+ * @typedef {Object} StrokeState
+ * @property {CanvasLineCap} lineCap
+ * @property {Array<number>} lineDash
+ * @property {number} lineDashOffset
+ * @property {CanvasLineJoin} lineJoin
+ * @property {number} lineWidth
+ * @property {number} miterLimit
+ * @property {import("../colorlike.js").ColorLike} strokeStyle
+ */
+
+
+/**
+ * @typedef {Object} TextState
+ * @property {string} font
+ * @property {string} [textAlign]
+ * @property {string} textBaseline
+ * @property {string} [placement]
+ * @property {number} [maxAngle]
+ * @property {boolean} [overflow]
+ * @property {import("../style/Fill.js").default} [backgroundFill]
+ * @property {import("../style/Stroke.js").default} [backgroundStroke]
+ * @property {number} [scale]
+ * @property {Array<number>} [padding]
+ */
+
+/**
+ * Container for decluttered replay instructions that need to be rendered or
+ * omitted together, i.e. when styles render both an image and text, or for the
+ * characters that form text along lines. The basic elements of this array are
+ * `[minX, minY, maxX, maxY, count]`, where the first four entries are the
+ * rendered extent of the group in pixel space. `count` is the number of styles
+ * in the group, i.e. 2 when an image and a text are grouped, or 1 otherwise.
+ * In addition to these four elements, declutter instruction arrays (i.e. the
+ * arguments to {@link module:ol/render/canvas~drawImage} are appended to the array.
+ * @typedef {Array<*>} DeclutterGroup
+ */
+
+
+/**
+ * Declutter groups for support of multi geometries.
+ * @typedef {Array<DeclutterGroup>} DeclutterGroups
+ */
 
 
 /**
  * @const
  * @type {string}
  */
-_ol_render_canvas_.defaultFont = '10px sans-serif';
+export const defaultFont = '10px sans-serif';
 
 
 /**
  * @const
- * @type {ol.Color}
+ * @type {import("../colorlike.js").ColorLike}
  */
-_ol_render_canvas_.defaultFillStyle = [0, 0, 0, 1];
+export const defaultFillStyle = '#000';
 
 
 /**
  * @const
- * @type {string}
+ * @type {CanvasLineCap}
  */
-_ol_render_canvas_.defaultLineCap = 'round';
+export const defaultLineCap = 'round';
 
 
 /**
  * @const
- * @type {Array.<number>}
+ * @type {Array<number>}
  */
-_ol_render_canvas_.defaultLineDash = [];
+export const defaultLineDash = [];
 
 
 /**
  * @const
  * @type {number}
  */
-_ol_render_canvas_.defaultLineDashOffset = 0;
+export const defaultLineDashOffset = 0;
 
 
 /**
  * @const
- * @type {string}
+ * @type {CanvasLineJoin}
  */
-_ol_render_canvas_.defaultLineJoin = 'round';
-
-
-/**
- * @const
- * @type {number}
- */
-_ol_render_canvas_.defaultMiterLimit = 10;
-
-
-/**
- * @const
- * @type {ol.Color}
- */
-_ol_render_canvas_.defaultStrokeStyle = [0, 0, 0, 1];
-
-
-/**
- * @const
- * @type {string}
- */
-_ol_render_canvas_.defaultTextAlign = 'center';
-
-
-/**
- * @const
- * @type {string}
- */
-_ol_render_canvas_.defaultTextBaseline = 'middle';
-
-
-/**
- * @const
- * @type {Array.<number>}
- */
-_ol_render_canvas_.defaultPadding = [0, 0, 0, 0];
+export const defaultLineJoin = 'round';
 
 
 /**
  * @const
  * @type {number}
  */
-_ol_render_canvas_.defaultLineWidth = 1;
+export const defaultMiterLimit = 10;
 
 
 /**
- * @type {ol.structs.LRUCache.<HTMLCanvasElement>}
+ * @const
+ * @type {import("../colorlike.js").ColorLike}
  */
-_ol_render_canvas_.labelCache = new LRUCache();
+export const defaultStrokeStyle = '#000';
 
 
 /**
- * @type {!Object.<string, number>}
+ * @const
+ * @type {string}
  */
-_ol_render_canvas_.checkedFonts_ = {};
+export const defaultTextAlign = 'center';
 
+
+/**
+ * @const
+ * @type {string}
+ */
+export const defaultTextBaseline = 'middle';
+
+
+/**
+ * @const
+ * @type {Array<number>}
+ */
+export const defaultPadding = [0, 0, 0, 0];
+
+
+/**
+ * @const
+ * @type {number}
+ */
+export const defaultLineWidth = 1;
+
+/**
+ * @type {BaseObject}
+ */
+export const checkedFonts = new BaseObject();
+
+/**
+ * The label cache for text rendering. To change the default cache size of 2048
+ * entries, use {@link module:ol/structs/LRUCache#setSize}.
+ * Deprecated - there is no label cache any more.
+ * @type {?}
+ * @api
+ * @deprecated
+ */
+export const labelCache = new EventTarget();
+labelCache.setSize = function() {
+  console.warn('labelCache is deprecated.'); //eslint-disable-line
+};
 
 /**
  * @type {CanvasRenderingContext2D}
  */
-_ol_render_canvas_.measureContext_ = null;
-
+let measureContext = null;
 
 /**
- * @type {!Object.<string, number>}
+ * @type {string}
  */
-_ol_render_canvas_.textHeights_ = {};
+let measureFont;
+
+/**
+ * @type {!Object<string, number>}
+ */
+export const textHeights = {};
 
 
 /**
  * Clears the label cache when a font becomes available.
  * @param {string} fontSpec CSS font spec.
  */
-_ol_render_canvas_.checkFont = (function() {
-  const retries = 60;
-  const checked = _ol_render_canvas_.checkedFonts_;
-  const labelCache = _ol_render_canvas_.labelCache;
+export const registerFont = (function() {
+  const retries = 100;
   const size = '32px ';
   const referenceFonts = ['monospace', 'serif'];
   const len = referenceFonts.length;
-  const text = 'wmytzilWMYTZIL@#/&?$%10';
+  const text = 'wmytzilWMYTZIL@#/&?$%10\uF013';
   let interval, referenceWidth;
 
-  function isAvailable(font) {
-    const context = _ol_render_canvas_.getMeasureContext();
+  /**
+   * @param {string} fontStyle Css font-style
+   * @param {string} fontWeight Css font-weight
+   * @param {*} fontFamily Css font-family
+   * @return {boolean} Font with style and weight is available
+   */
+  function isAvailable(fontStyle, fontWeight, fontFamily) {
     let available = true;
     for (let i = 0; i < len; ++i) {
       const referenceFont = referenceFonts[i];
-      context.font = size + referenceFont;
-      referenceWidth = context.measureText(text).width;
-      if (font != referenceFont) {
-        context.font = size + font + ',' + referenceFont;
-        const width = context.measureText(text).width;
+      referenceWidth = measureTextWidth(fontStyle + ' ' + fontWeight + ' ' + size + referenceFont, text);
+      if (fontFamily != referenceFont) {
+        const width = measureTextWidth(fontStyle + ' ' + fontWeight + ' ' + size + fontFamily + ',' + referenceFont, text);
         // If width and referenceWidth are the same, then the fallback was used
         // instead of the font we wanted, so the font is not available.
         available = available && width != referenceWidth;
       }
     }
-    return available;
+    if (available) {
+      return true;
+    }
+    return false;
   }
 
   function check() {
     let done = true;
-    for (const font in checked) {
-      if (checked[font] < retries) {
-        if (isAvailable(font)) {
-          checked[font] = retries;
-          clear(_ol_render_canvas_.textHeights_);
+    const fonts = checkedFonts.getKeys();
+    for (let i = 0, ii = fonts.length; i < ii; ++i) {
+      const font = fonts[i];
+      if (checkedFonts.get(font) < retries) {
+        if (isAvailable.apply(this, font.split('\n'))) {
+          clear(textHeights);
           // Make sure that loaded fonts are picked up by Safari
-          _ol_render_canvas_.measureContext_ = null;
-          labelCache.clear();
+          measureContext = null;
+          measureFont = undefined;
+          checkedFonts.set(font, retries);
         } else {
-          ++checked[font];
+          checkedFonts.set(font, checkedFonts.get(font) + 1, true);
           done = false;
         }
       }
     }
     if (done) {
-      window.clearInterval(interval);
+      clearInterval(interval);
       interval = undefined;
     }
   }
 
   return function(fontSpec) {
-    const fontFamilies = getFontFamilies(fontSpec);
-    if (!fontFamilies) {
+    const font = getFontParameters(fontSpec);
+    if (!font) {
       return;
     }
-    for (let i = 0, ii = fontFamilies.length; i < ii; ++i) {
-      const fontFamily = fontFamilies[i];
-      if (!(fontFamily in checked)) {
-        checked[fontFamily] = retries;
-        if (!isAvailable(fontFamily)) {
-          checked[fontFamily] = 0;
+    const families = font.families;
+    for (let i = 0, ii = families.length; i < ii; ++i) {
+      const family = families[i];
+      const key = font.style + '\n' + font.weight + '\n' + family;
+      if (checkedFonts.get(key) === undefined) {
+        checkedFonts.set(key, retries, true);
+        if (!isAvailable(font.style, font.weight, family)) {
+          checkedFonts.set(key, 0, true);
           if (interval === undefined) {
-            interval = window.setInterval(check, 32);
+            interval = setInterval(check, 32);
           }
         }
       }
@@ -193,38 +288,31 @@ _ol_render_canvas_.checkFont = (function() {
 
 
 /**
- * @return {CanvasRenderingContext2D} Measure context.
- */
-_ol_render_canvas_.getMeasureContext = function() {
-  let context = _ol_render_canvas_.measureContext_;
-  if (!context) {
-    context = _ol_render_canvas_.measureContext_ = createCanvasContext2D(1, 1);
-  }
-  return context;
-};
-
-
-/**
  * @param {string} font Font to use for measuring.
- * @return {ol.Size} Measurement.
+ * @return {import("../size.js").Size} Measurement.
  */
-_ol_render_canvas_.measureTextHeight = (function() {
-  let span;
-  const heights = _ol_render_canvas_.textHeights_;
+export const measureTextHeight = (function() {
+  /**
+   * @type {HTMLDivElement}
+   */
+  let div;
+  const heights = textHeights;
   return function(font) {
     let height = heights[font];
     if (height == undefined) {
-      if (!span) {
-        span = document.createElement('span');
-        span.textContent = 'M';
-        span.style.margin = span.style.padding = '0 !important';
-        span.style.position = 'absolute !important';
-        span.style.left = '-99999px !important';
+      if (!div) {
+        div = document.createElement('div');
+        div.innerHTML = 'M';
+        div.style.margin = '0 !important';
+        div.style.padding = '0 !important';
+        div.style.position = 'absolute !important';
+        div.style.left = '-99999px !important';
       }
-      span.style.font = font;
-      document.body.appendChild(span);
-      height = heights[font] = span.offsetHeight;
-      document.body.removeChild(span);
+      div.style.font = font;
+      document.body.appendChild(div);
+      height = div.offsetHeight;
+      heights[font] = height;
+      document.body.removeChild(div);
     }
     return height;
   };
@@ -236,13 +324,52 @@ _ol_render_canvas_.measureTextHeight = (function() {
  * @param {string} text Text.
  * @return {number} Width.
  */
-_ol_render_canvas_.measureTextWidth = function(font, text) {
-  const measureContext = _ol_render_canvas_.getMeasureContext();
-  if (font != measureContext.font) {
+export function measureTextWidth(font, text) {
+  if (!measureContext) {
+    measureContext = createCanvasContext2D(1, 1);
+  }
+  if (font != measureFont) {
     measureContext.font = font;
+    measureFont = measureContext.font;
   }
   return measureContext.measureText(text).width;
-};
+}
+
+
+/**
+ * Measure text width using a cache.
+ * @param {string} font The font.
+ * @param {string} text The text to measure.
+ * @param {Object<string, number>} cache A lookup of cached widths by text.
+ * @returns {number} The text width.
+ */
+export function measureAndCacheTextWidth(font, text, cache) {
+  if (text in cache) {
+    return cache[text];
+  }
+  const width = measureTextWidth(font, text);
+  cache[text] = width;
+  return width;
+}
+
+
+/**
+ * @param {string} font Font to use for measuring.
+ * @param {Array<string>} lines Lines to measure.
+ * @param {Array<number>} widths Array will be populated with the widths of
+ * each line.
+ * @return {number} Width of the whole text.
+ */
+export function measureTextWidths(font, lines, widths) {
+  const numLines = lines.length;
+  let width = 0;
+  for (let i = 0; i < numLines; ++i) {
+    const currentWidth = measureTextWidth(font, lines[i]);
+    width = Math.max(width, currentWidth);
+    widths.push(currentWidth);
+  }
+  return width;
+}
 
 
 /**
@@ -251,23 +378,20 @@ _ol_render_canvas_.measureTextWidth = function(font, text) {
  * @param {number} offsetX X offset.
  * @param {number} offsetY Y offset.
  */
-_ol_render_canvas_.rotateAtOffset = function(context, rotation, offsetX, offsetY) {
+export function rotateAtOffset(context, rotation, offsetX, offsetY) {
   if (rotation !== 0) {
     context.translate(offsetX, offsetY);
     context.rotate(rotation);
     context.translate(-offsetX, -offsetY);
   }
-};
-
-
-_ol_render_canvas_.resetTransform_ = _ol_transform_.create();
+}
 
 
 /**
  * @param {CanvasRenderingContext2D} context Context.
- * @param {ol.Transform|null} transform Transform.
+ * @param {import("../transform.js").Transform|null} transform Transform.
  * @param {number} opacity Opacity.
- * @param {HTMLImageElement|HTMLCanvasElement|HTMLVideoElement} image Image.
+ * @param {Label|HTMLCanvasElement|HTMLImageElement|HTMLVideoElement} labelOrImage Label.
  * @param {number} originX Origin X.
  * @param {number} originY Origin Y.
  * @param {number} w Width.
@@ -276,24 +400,38 @@ _ol_render_canvas_.resetTransform_ = _ol_transform_.create();
  * @param {number} y Y.
  * @param {number} scale Scale.
  */
-_ol_render_canvas_.drawImage = function(context,
-  transform, opacity, image, originX, originY, w, h, x, y, scale) {
-  let alpha;
-  if (opacity != 1) {
-    alpha = context.globalAlpha;
-    context.globalAlpha = alpha * opacity;
-  }
+export function drawImageOrLabel(context,
+  transform, opacity, labelOrImage, originX, originY, w, h, x, y, scale) {
+  context.save();
+
   if (transform) {
     context.setTransform.apply(context, transform);
   }
 
-  context.drawImage(image, originX, originY, w, h, x, y, w * scale, h * scale);
+  if ((/** @type {*} */ (labelOrImage).contextInstructions)) {
+    // label
+    context.translate(x, y);
+    context.scale(scale, scale);
+    executeLabelInstructions(/** @type {Label} */ (labelOrImage), context);
+  } else {
+    // image
+    context.drawImage(/** @type {HTMLCanvasElement|HTMLImageElement|HTMLVideoElement} */ (labelOrImage), originX, originY, w, h, x, y, w * scale, h * scale);
+  }
 
-  if (alpha) {
-    context.globalAlpha = alpha;
+  context.restore();
+}
+
+/**
+ * @param {Label} label Label.
+ * @param {CanvasRenderingContext2D} context Context.
+ */
+function executeLabelInstructions(label, context) {
+  const contextInstructions = label.contextInstructions;
+  for (let i = 0, ii = contextInstructions.length; i < ii; i += 2) {
+    if (Array.isArray(contextInstructions[i + 1])) {
+      CanvasRenderingContext2D.prototype[contextInstructions[i]].apply(context, contextInstructions[i + 1]);
+    } else {
+      context[contextInstructions[i]] = contextInstructions[i + 1];
+    }
   }
-  if (transform) {
-    context.setTransform.apply(context, _ol_render_canvas_.resetTransform_);
-  }
-};
-export default _ol_render_canvas_;
+}

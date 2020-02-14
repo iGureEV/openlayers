@@ -4,15 +4,11 @@ import MVT from '../src/ol/format/MVT.js';
 import VectorTileLayer from '../src/ol/layer/VectorTile.js';
 import {get as getProjection} from '../src/ol/proj.js';
 import VectorTileSource from '../src/ol/source/VectorTile.js';
-import Fill from '../src/ol/style/Fill.js';
-import Icon from '../src/ol/style/Icon.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
-import Text from '../src/ol/style/Text.js';
+import {Fill, Icon, Stroke, Style, Text} from '../src/ol/style.js';
 import TileGrid from '../src/ol/tilegrid/TileGrid.js';
 
 
-const key = 'pk.eyJ1IjoiYWhvY2V2YXIiLCJhIjoiRk1kMWZaSSJ9.E5BkluenyWQMsBLsuByrmg';
+const key = 'pk.eyJ1IjoiYWhvY2V2YXIiLCJhIjoiY2pzbmg0Nmk5MGF5NzQzbzRnbDNoeHJrbiJ9.7_-_gL8ur7ZtEiNwRfCy7Q';
 
 // Calculation of resolutions that match zoom levels 1, 3, 5, 7, 9, 11, 13, 15.
 const resolutions = [];
@@ -25,7 +21,7 @@ function tileUrlFunction(tileCoord) {
       '{z}/{x}/{y}.vector.pbf?access_token=' + key)
     .replace('{z}', String(tileCoord[0] * 2 - 1))
     .replace('{x}', String(tileCoord[1]))
-    .replace('{y}', String(-tileCoord[2] - 1))
+    .replace('{y}', String(tileCoord[2]))
     .replace('{a-d}', 'abcd'.substr(
       ((tileCoord[1] << tileCoord[0]) + tileCoord[2]) % 4, 1));
 }

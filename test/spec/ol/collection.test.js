@@ -95,7 +95,7 @@ describe('ol.collection', function() {
     describe('on an empty collection', function() {
       it('does not call the callback', function() {
         collection.forEach(cb);
-        expect(cb).to.not.be.called();
+        expect(cb.called).to.be(false);
       });
     });
     describe('on a non-empty collection', function() {
@@ -120,7 +120,7 @@ describe('ol.collection', function() {
       const cb = sinon.spy();
       listen(collection, CollectionEventType.REMOVE, cb);
       expect(collection.remove(1)).to.eql(1);
-      expect(cb).to.be.called();
+      expect(cb.called).to.be(true);
       expect(cb.lastCall.args[0].element).to.eql(1);
     });
     it('does not remove more than one matching element', function() {
@@ -140,53 +140,58 @@ describe('ol.collection', function() {
   describe('setAt and event', function() {
     it('does dispatch events', function() {
       const collection = new Collection(['a', 'b']);
-      let added, removed;
+      let added, removed, addedIndex, removedIndex;
       listen(collection, CollectionEventType.ADD, function(e) {
         added = e.element;
+        addedIndex = e.index;
       });
-      listen(
-        collection, CollectionEventType.REMOVE, function(e) {
-          removed = e.element;
-        });
+      listen(collection, CollectionEventType.REMOVE, function(e) {
+        removed = e.element;
+        removedIndex = e.index;
+      });
       collection.setAt(1, 1);
       expect(added).to.eql(1);
+      expect(addedIndex).to.eql(1);
       expect(removed).to.eql('b');
+      expect(removedIndex).to.eql(1);
     });
   });
 
   describe('removeAt and event', function() {
     it('does dispatch events', function() {
       const collection = new Collection(['a']);
-      let removed;
-      listen(
-        collection, CollectionEventType.REMOVE, function(e) {
-          removed = e.element;
-        });
+      let removed, removedIndex;
+      listen(collection, CollectionEventType.REMOVE, function(e) {
+        removed = e.element;
+        removedIndex = e.index;
+      });
       collection.pop();
       expect(removed).to.eql('a');
+      expect(removedIndex).to.eql(0);
     });
   });
 
   describe('insertAt and event', function() {
     it('does dispatch events', function() {
       const collection = new Collection([0, 2]);
-      let added;
-      listen(
-        collection, CollectionEventType.ADD, function(e) {
-          added = e.element;
-        });
+      let added, addedIndex;
+      listen(collection, CollectionEventType.ADD, function(e) {
+        added = e.element;
+        addedIndex = e.index;
+      });
       collection.insertAt(1, 1);
       expect(added).to.eql(1);
+      expect(addedIndex).to.eql(1);
     });
   });
 
   describe('setAt beyond end', function() {
     it('triggers events properly', function() {
-      const added = [];
-      listen(
-        collection, CollectionEventType.ADD, function(e) {
-          added.push(e.element);
-        });
+      const added = [], addedIndexes = [];
+      listen(collection, CollectionEventType.ADD, function(e) {
+        added.push(e.element);
+        addedIndexes.push(e.index);
+      });
       collection.setAt(2, 0);
       expect(collection.getLength()).to.eql(3);
       expect(collection.item(0)).to.be(undefined);
@@ -196,6 +201,7 @@ describe('ol.collection', function() {
       expect(added[0]).to.eql(undefined);
       expect(added[1]).to.eql(undefined);
       expect(added[2]).to.eql(0);
+      expect(addedIndexes).to.eql([0, 1, 2]);
     });
   });
 
@@ -210,21 +216,21 @@ describe('ol.collection', function() {
     describe('insertAt', function() {
       it('triggers change:length event', function() {
         collection.insertAt(2, 3);
-        expect(cb).to.be.called();
+        expect(cb.called).to.be(true);
       });
     });
 
     describe('removeAt', function() {
       it('triggers change:length event', function() {
         collection.removeAt(0);
-        expect(cb).to.be.called();
+        expect(cb.called).to.be(true);
       });
     });
 
     describe('setAt', function() {
       it('does not trigger change:length event', function() {
         collection.setAt(1, 1);
-        expect(cb).to.not.be.called();
+        expect(cb.called).to.be(false);
       });
     });
   });
@@ -232,12 +238,14 @@ describe('ol.collection', function() {
   describe('add event', function() {
     it('triggers add when pushing', function() {
       const collection = new Collection();
-      let elem;
+      let elem, addedIndex;
       listen(collection, CollectionEventType.ADD, function(e) {
         elem = e.element;
+        addedIndex = e.index;
       });
       const length = collection.push(1);
       expect(elem).to.eql(length);
+      expect(addedIndex).to.eql(0);
     });
   });
 
@@ -276,12 +284,14 @@ describe('ol.collection', function() {
     });
     it('fires events', function() {
       const collection = new Collection();
-      const elems = [];
+      const elems = [], addedIndexes = [];
       listen(collection, CollectionEventType.ADD, function(e) {
         elems.push(e.element);
+        addedIndexes.push(e.index);
       });
       collection.extend([1, 2]);
       expect(elems).to.eql([1, 2]);
+      expect(addedIndexes).to.eql([0, 1]);
     });
   });
 

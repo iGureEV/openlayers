@@ -1,13 +1,9 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import * as _ol_extent_ from '../src/ol/extent.js';
 import GeoJSON from '../src/ol/format/GeoJSON.js';
 import VectorLayer from '../src/ol/layer/Vector.js';
 import VectorSource from '../src/ol/source/Vector.js';
-import Fill from '../src/ol/style/Fill.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
-import Text from '../src/ol/style/Text.js';
+import {Fill, Stroke, Style, Text} from '../src/ol/style.js';
 
 const map = new Map({
   target: 'map',
@@ -18,23 +14,6 @@ const map = new Map({
 });
 
 const labelStyle = new Style({
-  geometry: function(feature) {
-    let geometry = feature.getGeometry();
-    if (geometry.getType() == 'MultiPolygon') {
-      // Only render label for the widest polygon of a multipolygon
-      const polygons = geometry.getPolygons();
-      let widest = 0;
-      for (let i = 0, ii = polygons.length; i < ii; ++i) {
-        const polygon = polygons[i];
-        const width = _ol_extent_.getWidth(polygon.getExtent());
-        if (width > widest) {
-          widest = width;
-          geometry = polygon;
-        }
-      }
-    }
-    return geometry;
-  },
   text: new Text({
     font: '12px Calibri,sans-serif',
     overflow: true,

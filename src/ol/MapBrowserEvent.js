@@ -1,84 +1,110 @@
 /**
  * @module ol/MapBrowserEvent
  */
-import {inherits} from './index.js';
 import MapEvent from './MapEvent.js';
 
 /**
  * @classdesc
  * Events emitted as map browser events are instances of this type.
- * See {@link ol.Map} for which events trigger a map browser event.
- *
- * @constructor
- * @extends {ol.MapEvent}
- * @implements {oli.MapBrowserEvent}
- * @param {string} type Event type.
- * @param {ol.PluggableMap} map Map.
- * @param {Event} browserEvent Browser event.
- * @param {boolean=} opt_dragging Is the map currently being dragged?
- * @param {?olx.FrameState=} opt_frameState Frame state.
+ * See {@link module:ol/PluggableMap~PluggableMap} for which events trigger a map browser event.
  */
-const MapBrowserEvent = function(type, map, browserEvent, opt_dragging,
-  opt_frameState) {
-
-  MapEvent.call(this, type, map, opt_frameState);
+class MapBrowserEvent extends MapEvent {
 
   /**
-   * The original browser event.
-   * @const
-   * @type {Event}
-   * @api
+   * @param {string} type Event type.
+   * @param {import("./PluggableMap.js").default} map Map.
+   * @param {Event} browserEvent Browser event.
+   * @param {boolean=} opt_dragging Is the map currently being dragged?
+   * @param {?import("./PluggableMap.js").FrameState=} opt_frameState Frame state.
    */
-  this.originalEvent = browserEvent;
+  constructor(type, map, browserEvent, opt_dragging, opt_frameState) {
+
+    super(type, map, opt_frameState);
+
+    /**
+     * The original browser event.
+     * @const
+     * @type {Event}
+     * @api
+     */
+    this.originalEvent = browserEvent;
+
+    /**
+     * The map pixel relative to the viewport corresponding to the original browser event.
+     * @type {?import("./pixel.js").Pixel}
+     */
+    this.pixel_ = null;
+
+    /**
+     * The coordinate in the user projection corresponding to the original browser event.
+     * @type {?import("./coordinate.js").Coordinate}
+     */
+    this.coordinate_ = null;
+
+    /**
+     * Indicates if the map is currently being dragged. Only set for
+     * `POINTERDRAG` and `POINTERMOVE` events. Default is `false`.
+     *
+     * @type {boolean}
+     * @api
+     */
+    this.dragging = opt_dragging !== undefined ? opt_dragging : false;
+
+  }
 
   /**
    * The map pixel relative to the viewport corresponding to the original browser event.
-   * @type {ol.Pixel}
+   * @type {import("./pixel.js").Pixel}
    * @api
    */
-  this.pixel = map.getEventPixel(browserEvent);
+  get pixel() {
+    if (!this.pixel_) {
+      this.pixel_ = this.map.getEventPixel(this.originalEvent);
+    }
+    return this.pixel_;
+  }
+  set pixel(pixel) {
+    this.pixel_ = pixel;
+  }
 
   /**
-   * The coordinate in view projection corresponding to the original browser event.
-   * @type {ol.Coordinate}
+   * The coordinate corresponding to the original browser event.  This will be in the user
+   * projection if one is set.  Otherwise it will be in the view projection.
+   * @type {import("./coordinate.js").Coordinate}
    * @api
    */
-  this.coordinate = map.getCoordinateFromPixel(this.pixel);
+  get coordinate() {
+    if (!this.coordinate_) {
+      this.coordinate_ = this.map.getCoordinateFromPixel(this.pixel);
+    }
+    return this.coordinate_;
+  }
+  set coordinate(coordinate) {
+    this.coordinate_ = coordinate;
+  }
 
   /**
-   * Indicates if the map is currently being dragged. Only set for
-   * `POINTERDRAG` and `POINTERMOVE` events. Default is `false`.
-   *
-   * @type {boolean}
+   * Prevents the default browser action.
+   * See https://developer.mozilla.org/en-US/docs/Web/API/event.preventDefault.
+   * @override
    * @api
    */
-  this.dragging = opt_dragging !== undefined ? opt_dragging : false;
+  preventDefault() {
+    super.preventDefault();
+    this.originalEvent.preventDefault();
+  }
 
-};
-
-inherits(MapBrowserEvent, MapEvent);
-
-
-/**
- * Prevents the default browser action.
- * @see https://developer.mozilla.org/en-US/docs/Web/API/event.preventDefault
- * @override
- * @api
- */
-MapBrowserEvent.prototype.preventDefault = function() {
-  MapEvent.prototype.preventDefault.call(this);
-  this.originalEvent.preventDefault();
-};
+  /**
+   * Prevents further propagation of the current event.
+   * See https://developer.mozilla.org/en-US/docs/Web/API/event.stopPropagation.
+   * @override
+   * @api
+   */
+  stopPropagation() {
+    super.stopPropagation();
+    this.originalEvent.stopPropagation();
+  }
+}
 
 
-/**
- * Prevents further propagation of the current event.
- * @see https://developer.mozilla.org/en-US/docs/Web/API/event.stopPropagation
- * @override
- * @api
- */
-MapBrowserEvent.prototype.stopPropagation = function() {
-  MapEvent.prototype.stopPropagation.call(this);
-  this.originalEvent.stopPropagation();
-};
 export default MapBrowserEvent;

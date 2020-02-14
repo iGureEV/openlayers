@@ -3,12 +3,10 @@ import Map from '../src/ol/Map.js';
 import Overlay from '../src/ol/Overlay.js';
 import View from '../src/ol/View.js';
 import Point from '../src/ol/geom/Point.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import VectorLayer from '../src/ol/layer/Vector.js';
+import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
 import TileJSON from '../src/ol/source/TileJSON.js';
 import VectorSource from '../src/ol/source/Vector.js';
-import Icon from '../src/ol/style/Icon.js';
-import Style from '../src/ol/style/Style.js';
+import {Icon, Style} from '../src/ol/style.js';
 
 
 const iconFeature = new Feature({
@@ -19,12 +17,12 @@ const iconFeature = new Feature({
 });
 
 const iconStyle = new Style({
-  image: new Icon(/** @type {olx.style.IconOptions} */ ({
+  image: new Icon({
     anchor: [0.5, 46],
     anchorXUnits: 'fraction',
     anchorYUnits: 'pixels',
     src: 'data/icon.png'
-  }))
+  })
 });
 
 iconFeature.setStyle(iconStyle);
@@ -39,7 +37,7 @@ const vectorLayer = new VectorLayer({
 
 const rasterLayer = new TileLayer({
   source: new TileJSON({
-    url: 'https://api.tiles.mapbox.com/v3/mapbox.geography-class.json?secure',
+    url: 'https://a.tiles.mapbox.com/v3/aj.1x1-degrees.json',
     crossOrigin: ''
   })
 });
@@ -73,9 +71,9 @@ map.on('click', function(evt) {
     const coordinates = feature.getGeometry().getCoordinates();
     popup.setPosition(coordinates);
     $(element).popover({
-      'placement': 'top',
-      'html': true,
-      'content': feature.get('name')
+      placement: 'top',
+      html: true,
+      content: feature.get('name')
     });
     $(element).popover('show');
   } else {

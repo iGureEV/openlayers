@@ -1,136 +1,114 @@
 /**
  * @module ol/render/VectorContext
  */
+
 /**
+ * @classdesc
  * Context for drawing geometries.  A vector context is available on render
  * events and does not need to be constructed directly.
- * @constructor
- * @abstract
- * @struct
  * @api
  */
-const VectorContext = function() {
-};
+class VectorContext {
+  /**
+   * Render a geometry with a custom renderer.
+   *
+   * @param {import("../geom/SimpleGeometry.js").default} geometry Geometry.
+   * @param {import("../Feature.js").FeatureLike} feature Feature.
+   * @param {Function} renderer Renderer.
+   */
+  drawCustom(geometry, feature, renderer) {}
 
+  /**
+   * Render a geometry.
+   *
+   * @param {import("../geom/Geometry.js").default} geometry The geometry to render.
+   */
+  drawGeometry(geometry) {}
 
-/**
- * Render a geometry with a custom renderer.
- *
- * @param {ol.geom.SimpleGeometry} geometry Geometry.
- * @param {ol.Feature|ol.render.Feature} feature Feature.
- * @param {Function} renderer Renderer.
- */
-VectorContext.prototype.drawCustom = function(geometry, feature, renderer) {};
+  /**
+   * Set the rendering style.
+   *
+   * @param {import("../style/Style.js").default} style The rendering style.
+   */
+  setStyle(style) {}
 
+  /**
+   * @param {import("../geom/Circle.js").default} circleGeometry Circle geometry.
+   * @param {import("../Feature.js").default} feature Feature.
+   */
+  drawCircle(circleGeometry, feature) {}
 
-/**
- * Render a geometry.
- *
- * @param {ol.geom.Geometry} geometry The geometry to render.
- */
-VectorContext.prototype.drawGeometry = function(geometry) {};
+  /**
+   * @param {import("../Feature.js").default} feature Feature.
+   * @param {import("../style/Style.js").default} style Style.
+   */
+  drawFeature(feature, style) {}
 
+  /**
+   * @param {import("../geom/GeometryCollection.js").default} geometryCollectionGeometry Geometry collection.
+   * @param {import("../Feature.js").default} feature Feature.
+   */
+  drawGeometryCollection(geometryCollectionGeometry, feature) {}
 
-/**
- * Set the rendering style.
- *
- * @param {ol.style.Style} style The rendering style.
- */
-VectorContext.prototype.setStyle = function(style) {};
+  /**
+   * @param {import("../geom/LineString.js").default|import("./Feature.js").default} lineStringGeometry Line string geometry.
+   * @param {import("../Feature.js").FeatureLike} feature Feature.
+   */
+  drawLineString(lineStringGeometry, feature) {}
 
+  /**
+   * @param {import("../geom/MultiLineString.js").default|import("./Feature.js").default} multiLineStringGeometry MultiLineString geometry.
+   * @param {import("../Feature.js").FeatureLike} feature Feature.
+   */
+  drawMultiLineString(multiLineStringGeometry, feature) {}
 
-/**
- * @param {ol.geom.Circle} circleGeometry Circle geometry.
- * @param {ol.Feature} feature Feature.
- */
-VectorContext.prototype.drawCircle = function(circleGeometry, feature) {};
+  /**
+   * @param {import("../geom/MultiPoint.js").default|import("./Feature.js").default} multiPointGeometry MultiPoint geometry.
+   * @param {import("../Feature.js").FeatureLike} feature Feature.
+   */
+  drawMultiPoint(multiPointGeometry, feature) {}
 
+  /**
+   * @param {import("../geom/MultiPolygon.js").default} multiPolygonGeometry MultiPolygon geometry.
+   * @param {import("../Feature.js").FeatureLike} feature Feature.
+   */
+  drawMultiPolygon(multiPolygonGeometry, feature) {}
 
-/**
- * @param {ol.Feature} feature Feature.
- * @param {ol.style.Style} style Style.
- */
-VectorContext.prototype.drawFeature = function(feature, style) {};
+  /**
+   * @param {import("../geom/Point.js").default|import("./Feature.js").default} pointGeometry Point geometry.
+   * @param {import("../Feature.js").FeatureLike} feature Feature.
+   */
+  drawPoint(pointGeometry, feature) {}
 
+  /**
+   * @param {import("../geom/Polygon.js").default|import("./Feature.js").default} polygonGeometry Polygon geometry.
+   * @param {import("../Feature.js").FeatureLike} feature Feature.
+   */
+  drawPolygon(polygonGeometry, feature) {}
 
-/**
- * @param {ol.geom.GeometryCollection} geometryCollectionGeometry Geometry
- *     collection.
- * @param {ol.Feature} feature Feature.
- */
-VectorContext.prototype.drawGeometryCollection = function(geometryCollectionGeometry, feature) {};
+  /**
+   * @param {import("../geom/Geometry.js").default|import("./Feature.js").default} geometry Geometry.
+   * @param {import("../Feature.js").FeatureLike} feature Feature.
+   */
+  drawText(geometry, feature) {}
 
+  /**
+   * @param {import("../style/Fill.js").default} fillStyle Fill style.
+   * @param {import("../style/Stroke.js").default} strokeStyle Stroke style.
+   */
+  setFillStrokeStyle(fillStyle, strokeStyle) {}
 
-/**
- * @param {ol.geom.LineString|ol.render.Feature} lineStringGeometry Line
- *     string geometry.
- * @param {ol.Feature|ol.render.Feature} feature Feature.
- */
-VectorContext.prototype.drawLineString = function(lineStringGeometry, feature) {};
+  /**
+   * @param {import("../style/Image.js").default} imageStyle Image style.
+   * @param {import("./canvas.js").DeclutterGroup=} opt_declutterGroup Declutter.
+   */
+  setImageStyle(imageStyle, opt_declutterGroup) {}
 
+  /**
+   * @param {import("../style/Text.js").default} textStyle Text style.
+   * @param {import("./canvas.js").DeclutterGroups=} opt_declutterGroups Declutter.
+   */
+  setTextStyle(textStyle, opt_declutterGroups) {}
+}
 
-/**
- * @param {ol.geom.MultiLineString|ol.render.Feature} multiLineStringGeometry
- *     MultiLineString geometry.
- * @param {ol.Feature|ol.render.Feature} feature Feature.
- */
-VectorContext.prototype.drawMultiLineString = function(multiLineStringGeometry, feature) {};
-
-
-/**
- * @param {ol.geom.MultiPoint|ol.render.Feature} multiPointGeometry MultiPoint
- *     geometry.
- * @param {ol.Feature|ol.render.Feature} feature Feature.
- */
-VectorContext.prototype.drawMultiPoint = function(multiPointGeometry, feature) {};
-
-
-/**
- * @param {ol.geom.MultiPolygon} multiPolygonGeometry MultiPolygon geometry.
- * @param {ol.Feature|ol.render.Feature} feature Feature.
- */
-VectorContext.prototype.drawMultiPolygon = function(multiPolygonGeometry, feature) {};
-
-
-/**
- * @param {ol.geom.Point|ol.render.Feature} pointGeometry Point geometry.
- * @param {ol.Feature|ol.render.Feature} feature Feature.
- */
-VectorContext.prototype.drawPoint = function(pointGeometry, feature) {};
-
-
-/**
- * @param {ol.geom.Polygon|ol.render.Feature} polygonGeometry Polygon
- *     geometry.
- * @param {ol.Feature|ol.render.Feature} feature Feature.
- */
-VectorContext.prototype.drawPolygon = function(polygonGeometry, feature) {};
-
-
-/**
- * @param {ol.geom.Geometry|ol.render.Feature} geometry Geometry.
- * @param {ol.Feature|ol.render.Feature} feature Feature.
- */
-VectorContext.prototype.drawText = function(geometry, feature) {};
-
-
-/**
- * @param {ol.style.Fill} fillStyle Fill style.
- * @param {ol.style.Stroke} strokeStyle Stroke style.
- */
-VectorContext.prototype.setFillStrokeStyle = function(fillStyle, strokeStyle) {};
-
-
-/**
- * @param {ol.style.Image} imageStyle Image style.
- * @param {ol.DeclutterGroup=} opt_declutterGroup Declutter.
- */
-VectorContext.prototype.setImageStyle = function(imageStyle, opt_declutterGroup) {};
-
-
-/**
- * @param {ol.style.Text} textStyle Text style.
- * @param {ol.DeclutterGroup=} opt_declutterGroup Declutter.
- */
-VectorContext.prototype.setTextStyle = function(textStyle, opt_declutterGroup) {};
 export default VectorContext;

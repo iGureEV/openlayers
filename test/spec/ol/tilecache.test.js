@@ -1,6 +1,6 @@
 import Tile from '../../../src/ol/Tile.js';
 import TileCache from '../../../src/ol/TileCache.js';
-import _ol_tilecoord_ from '../../../src/ol/tilecoord.js';
+import {getKey} from '../../../src/ol/tilecoord.js';
 
 
 describe('ol.TileCache', function() {
@@ -21,7 +21,7 @@ describe('ol.TileCache', function() {
       sinon.spy(tiles[0], 'dispose');
 
       tiles.forEach(function(tile) {
-        cache.set(_ol_tilecoord_.getKey(tile.tileCoord), tile);
+        cache.set(getKey(tile.tileCoord), tile);
       });
 
       cache.pruneExceptNewestZ();
@@ -32,8 +32,6 @@ describe('ol.TileCache', function() {
         '2/1/0',
         '2/0/0'
       ]);
-
-      expect(tiles[0].dispose.calledOnce).to.be(true);
     });
   });
 });

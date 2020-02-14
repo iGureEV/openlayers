@@ -1,10 +1,11 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
-import LayerGroup from '../src/ol/layer/Group.js';
-import TileLayer from '../src/ol/layer/Tile.js';
+import {Group as LayerGroup, Tile as TileLayer} from '../src/ol/layer.js';
 import {fromLonLat} from '../src/ol/proj.js';
 import OSM from '../src/ol/source/OSM.js';
 import TileJSON from '../src/ol/source/TileJSON.js';
+
+const key = 'pk.eyJ1IjoiYWhvY2V2YXIiLCJhIjoiY2pzbmg0Nmk5MGF5NzQzbzRnbDNoeHJrbiJ9.7_-_gL8ur7ZtEiNwRfCy7Q';
 
 const map = new Map({
   layers: [
@@ -14,13 +15,13 @@ const map = new Map({
       layers: [
         new TileLayer({
           source: new TileJSON({
-            url: 'https://api.tiles.mapbox.com/v3/mapbox.20110804-hoa-foodinsecurity-3month.json?secure',
+            url: 'https://api.tiles.mapbox.com/v4/mapbox.20110804-hoa-foodinsecurity-3month.json?secure&access_token=' + key,
             crossOrigin: 'anonymous'
           })
         }),
         new TileLayer({
           source: new TileJSON({
-            url: 'https://api.tiles.mapbox.com/v3/mapbox.world-borders-light.json?secure',
+            url: 'https://api.tiles.mapbox.com/v4/mapbox.world-borders-light.json?secure&access_token=' + key,
             crossOrigin: 'anonymous'
           })
         })

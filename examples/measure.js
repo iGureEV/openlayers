@@ -1,19 +1,13 @@
 import Map from '../src/ol/Map.js';
-import Observable from '../src/ol/Observable.js';
+import {unByKey} from '../src/ol/Observable.js';
 import Overlay from '../src/ol/Overlay.js';
 import {getArea, getLength} from '../src/ol/sphere.js';
 import View from '../src/ol/View.js';
-import LineString from '../src/ol/geom/LineString.js';
-import Polygon from '../src/ol/geom/Polygon.js';
+import {LineString, Polygon} from '../src/ol/geom.js';
 import Draw from '../src/ol/interaction/Draw.js';
-import TileLayer from '../src/ol/layer/Tile.js';
-import VectorLayer from '../src/ol/layer/Vector.js';
-import OSM from '../src/ol/source/OSM.js';
-import VectorSource from '../src/ol/source/Vector.js';
-import CircleStyle from '../src/ol/style/Circle.js';
-import Fill from '../src/ol/style/Fill.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
+import {Tile as TileLayer, Vector as VectorLayer} from '../src/ol/layer.js';
+import {OSM, Vector as VectorSource} from '../src/ol/source.js';
+import {Circle as CircleStyle, Fill, Stroke, Style} from '../src/ol/style.js';
 
 
 const raster = new TileLayer({
@@ -44,35 +38,35 @@ const vector = new VectorLayer({
 
 /**
  * Currently drawn feature.
- * @type {ol.Feature}
+ * @type {import("../src/ol/Feature.js").default}
  */
 let sketch;
 
 
 /**
  * The help tooltip element.
- * @type {Element}
+ * @type {HTMLElement}
  */
 let helpTooltipElement;
 
 
 /**
  * Overlay to show the help messages.
- * @type {ol.Overlay}
+ * @type {Overlay}
  */
 let helpTooltip;
 
 
 /**
  * The measure tooltip element.
- * @type {Element}
+ * @type {HTMLElement}
  */
 let measureTooltipElement;
 
 
 /**
  * Overlay to show the measurement.
- * @type {ol.Overlay}
+ * @type {Overlay}
  */
 let measureTooltip;
 
@@ -93,7 +87,7 @@ const continueLineMsg = 'Click to continue drawing the line';
 
 /**
  * Handle pointer move.
- * @param {ol.MapBrowserEvent} evt The event.
+ * @param {import("../src/ol/MapBrowserEvent").default} evt The event.
  */
 const pointerMoveHandler = function(evt) {
   if (evt.dragging) {
@@ -103,7 +97,7 @@ const pointerMoveHandler = function(evt) {
   let helpMsg = 'Click to start drawing';
 
   if (sketch) {
-    const geom = (sketch.getGeometry());
+    const geom = sketch.getGeometry();
     if (geom instanceof Polygon) {
       helpMsg = continuePolygonMsg;
     } else if (geom instanceof LineString) {
@@ -140,7 +134,7 @@ let draw; // global so we can remove it later
 
 /**
  * Format length output.
- * @param {ol.geom.LineString} line The line.
+ * @param {LineString} line The line.
  * @return {string} The formatted length.
  */
 const formatLength = function(line) {
@@ -159,7 +153,7 @@ const formatLength = function(line) {
 
 /**
  * Format area output.
- * @param {ol.geom.Polygon} polygon The polygon.
+ * @param {Polygon} polygon The polygon.
  * @return {string} Formatted area.
  */
 const formatArea = function(polygon) {
@@ -211,7 +205,7 @@ function addInteraction() {
       // set sketch
       sketch = evt.feature;
 
-      /** @type {ol.Coordinate|undefined} */
+      /** @type {import("../src/ol/coordinate.js").Coordinate|undefined} */
       let tooltipCoord = evt.coordinate;
 
       listener = sketch.getGeometry().on('change', function(evt) {
@@ -227,19 +221,19 @@ function addInteraction() {
         measureTooltipElement.innerHTML = output;
         measureTooltip.setPosition(tooltipCoord);
       });
-    }, this);
+    });
 
   draw.on('drawend',
     function() {
-      measureTooltipElement.className = 'tooltip tooltip-static';
+      measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
       measureTooltip.setOffset([0, -7]);
       // unset sketch
       sketch = null;
       // unset tooltip so that a new one can be created
       measureTooltipElement = null;
       createMeasureTooltip();
-      Observable.unByKey(listener);
-    }, this);
+      unByKey(listener);
+    });
 }
 
 
@@ -251,7 +245,7 @@ function createHelpTooltip() {
     helpTooltipElement.parentNode.removeChild(helpTooltipElement);
   }
   helpTooltipElement = document.createElement('div');
-  helpTooltipElement.className = 'tooltip hidden';
+  helpTooltipElement.className = 'ol-tooltip hidden';
   helpTooltip = new Overlay({
     element: helpTooltipElement,
     offset: [15, 0],
@@ -269,7 +263,7 @@ function createMeasureTooltip() {
     measureTooltipElement.parentNode.removeChild(measureTooltipElement);
   }
   measureTooltipElement = document.createElement('div');
-  measureTooltipElement.className = 'tooltip tooltip-measure';
+  measureTooltipElement.className = 'ol-tooltip ol-tooltip-measure';
   measureTooltip = new Overlay({
     element: measureTooltipElement,
     offset: [0, -15],

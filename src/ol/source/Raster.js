@@ -1,25 +1,40 @@
 /**
  * @module ol/source/Raster
  */
-import {getUid, inherits} from '../index.js';
 import ImageCanvas from '../ImageCanvas.js';
 import TileQueue from '../TileQueue.js';
 import {createCanvasContext2D} from '../dom.js';
-import {listen} from '../events.js';
 import Event from '../events/Event.js';
 import EventType from '../events/EventType.js';
-import {Processor} from 'pixelworks/lib/index';
+import {Processor} from 'pixelworks/lib/index.js';
 import {equals, getCenter, getHeight, getWidth} from '../extent.js';
 import ImageLayer from '../layer/Image.js';
 import TileLayer from '../layer/Tile.js';
 import {assign} from '../obj.js';
-import CanvasImageLayerRenderer from '../renderer/canvas/ImageLayer.js';
-import CanvasTileLayerRenderer from '../renderer/canvas/TileLayer.js';
-import ImageSource from '../source/Image.js';
-import RasterOperationType from '../source/RasterOperationType.js';
-import SourceState from '../source/State.js';
-import TileSource from '../source/Tile.js';
-import _ol_transform_ from '../transform.js';
+import {create as createTransform} from '../transform.js';
+import ImageSource from './Image.js';
+import TileSource from './Tile.js';
+import SourceState from './State.js';
+import Source from './Source.js';
+
+
+/**
+ * A function that takes an array of input data, performs some operation, and
+ * returns an array of output data.
+ * For `pixel` type operations, the function will be called with an array of
+ * pixels, where each pixel is an array of four numbers (`[r, g, b, a]`) in the
+ * range of 0 - 255. It should return a single pixel array.
+ * For `'image'` type operations, functions will be called with an array of
+ * {@link ImageData https://developer.mozilla.org/en-US/docs/Web/API/ImageData}
+ * and should return a single {@link ImageData
+ * https://developer.mozilla.org/en-US/docs/Web/API/ImageData}.  The operations
+ * are called with a second "data" argument, which can be used for storage.  The
+ * data object is accessible from raster events, where it can be initialized in
+ * "beforeoperations" and accessed again in "afteroperations".
+ *
+ * @typedef {function((Array<Array<number>>|Array<ImageData>), Object):
+ *     (Array<number>|ImageData)} Operation
+ */
 
 
 /**
@@ -28,14 +43,14 @@ import _ol_transform_ from '../transform.js';
 const RasterEventType = {
   /**
    * Triggered before operations are run.
-   * @event ol.source.Raster.Event#beforeoperations
+   * @event module:ol/source/Raster.RasterSourceEvent#beforeoperations
    * @api
    */
   BEFOREOPERATIONS: 'beforeoperations',
 
   /**
    * Triggered after operations are run.
-   * @event ol.source.Raster.Event#afteroperations
+   * @event module:ol/source/Raster.RasterSourceEvent#afteroperations
    * @api
    */
   AFTEROPERATIONS: 'afteroperations'
@@ -43,287 +58,363 @@ const RasterEventType = {
 
 
 /**
+ * Raster operation type. Supported values are `'pixel'` and `'image'`.
+ * @enum {string}
+ */
+const RasterOperationType = {
+  PIXEL: 'pixel',
+  IMAGE: 'image'
+};
+
+
+/**
+ * @classdesc
+ * Events emitted by {@link module:ol/source/Raster} instances are instances of this
+ * type.
+ */
+export class RasterSourceEvent extends Event {
+  /**
+   * @param {string} type Type.
+   * @param {import("../PluggableMap.js").FrameState} frameState The frame state.
+   * @param {Object} data An object made available to operations.
+   */
+  constructor(type, frameState, data) {
+    super(type);
+
+    /**
+     * The raster extent.
+     * @type {import("../extent.js").Extent}
+     * @api
+     */
+    this.extent = frameState.extent;
+
+    /**
+     * The pixel resolution (map units per pixel).
+     * @type {number}
+     * @api
+     */
+    this.resolution = frameState.viewState.resolution / frameState.pixelRatio;
+
+    /**
+     * An object made available to all operations.  This can be used by operations
+     * as a storage object (e.g. for calculating statistics).
+     * @type {Object}
+     * @api
+     */
+    this.data = data;
+
+  }
+
+}
+
+/**
+ * @typedef {Object} Options
+ * @property {Array<import("./Source.js").default|import("../layer/Layer.js").default>} sources Input
+ * sources or layers.  For vector data, use an VectorImage layer.
+ * @property {Operation} [operation] Raster operation.
+ * The operation will be called with data from input sources
+ * and the output will be assigned to the raster source.
+ * @property {Object} [lib] Functions that will be made available to operations run in a worker.
+ * @property {number} [threads] By default, operations will be run in a single worker thread.
+ * To avoid using workers altogether, set `threads: 0`.  For pixel operations, operations can
+ * be run in multiple worker threads.  Note that there is additional overhead in
+ * transferring data to multiple workers, and that depending on the user's
+ * system, it may not be possible to parallelize the work.
+ * @property {RasterOperationType} [operationType='pixel'] Operation type.
+ * Supported values are `'pixel'` and `'image'`.  By default,
+ * `'pixel'` operations are assumed, and operations will be called with an
+ * array of pixels from input sources.  If set to `'image'`, operations will
+ * be called with an array of ImageData objects from input sources.
+ */
+
+
+/**
  * @classdesc
  * A source that transforms data from any number of input sources using an
- * {@link ol.RasterOperation} function to transform input pixel values into
+ * {@link module:ol/source/Raster~Operation} function to transform input pixel values into
  * output pixel values.
  *
- * @constructor
- * @extends {ol.source.Image}
- * @fires ol.source.Raster.Event
- * @param {olx.source.RasterOptions} options Options.
+ * @fires module:ol/source/Raster.RasterSourceEvent
  * @api
  */
-const RasterSource = function(options) {
-
+class RasterSource extends ImageSource {
   /**
-   * @private
-   * @type {*}
+   * @param {Options} options Options.
    */
-  this.worker_ = null;
+  constructor(options) {
+    super({
+      projection: null
+    });
 
-  /**
-   * @private
-   * @type {ol.source.RasterOperationType}
-   */
-  this.operationType_ = options.operationType !== undefined ?
-    options.operationType : RasterOperationType.PIXEL;
+    /**
+     * @private
+     * @type {*}
+     */
+    this.worker_ = null;
 
-  /**
-   * @private
-   * @type {number}
-   */
-  this.threads_ = options.threads !== undefined ? options.threads : 1;
+    /**
+     * @private
+     * @type {RasterOperationType}
+     */
+    this.operationType_ = options.operationType !== undefined ?
+      options.operationType : RasterOperationType.PIXEL;
 
-  /**
-   * @private
-   * @type {Array.<ol.renderer.canvas.Layer>}
-   */
-  this.renderers_ = createRenderers(options.sources);
+    /**
+     * @private
+     * @type {number}
+     */
+    this.threads_ = options.threads !== undefined ? options.threads : 1;
 
-  for (let r = 0, rr = this.renderers_.length; r < rr; ++r) {
-    listen(this.renderers_[r], EventType.CHANGE,
-      this.changed, this);
-  }
+    /**
+     * @private
+     * @type {Array<import("../layer/Layer.js").default>}
+     */
+    this.layers_ = createLayers(options.sources);
 
-  /**
-   * @private
-   * @type {ol.TileQueue}
-   */
-  this.tileQueue_ = new TileQueue(
-    function() {
+    const changed = this.changed.bind(this);
+    for (let i = 0, ii = this.layers_.length; i < ii; ++i) {
+      this.layers_[i].addEventListener(EventType.CHANGE, changed);
+    }
+
+    /**
+     * @private
+     * @type {import("../TileQueue.js").default}
+     */
+    this.tileQueue_ = new TileQueue(function() {
       return 1;
-    },
-    this.changed.bind(this));
+    }, this.changed.bind(this));
 
-  const layerStatesArray = getLayerStatesArray(this.renderers_);
-  const layerStates = {};
-  for (let i = 0, ii = layerStatesArray.length; i < ii; ++i) {
-    layerStates[getUid(layerStatesArray[i].layer)] = layerStatesArray[i];
-  }
+    /**
+     * The most recently requested frame state.
+     * @type {import("../PluggableMap.js").FrameState}
+     * @private
+     */
+    this.requestedFrameState_;
 
-  /**
-   * The most recently requested frame state.
-   * @type {olx.FrameState}
-   * @private
-   */
-  this.requestedFrameState_;
+    /**
+     * The most recently rendered image canvas.
+     * @type {import("../ImageCanvas.js").default}
+     * @private
+     */
+    this.renderedImageCanvas_ = null;
 
-  /**
-   * The most recently rendered image canvas.
-   * @type {ol.ImageCanvas}
-   * @private
-   */
-  this.renderedImageCanvas_ = null;
+    /**
+     * The most recently rendered revision.
+     * @type {number}
+     */
+    this.renderedRevision_;
 
-  /**
-   * The most recently rendered revision.
-   * @type {number}
-   */
-  this.renderedRevision_;
+    /**
+     * @private
+     * @type {import("../PluggableMap.js").FrameState}
+     */
+    this.frameState_ = {
+      animate: false,
+      coordinateToPixelTransform: createTransform(),
+      extent: null,
+      index: 0,
+      layerIndex: 0,
+      layerStatesArray: getLayerStatesArray(this.layers_),
+      pixelRatio: 1,
+      pixelToCoordinateTransform: createTransform(),
+      postRenderFunctions: [],
+      size: [0, 0],
+      tileQueue: this.tileQueue_,
+      time: Date.now(),
+      usedTiles: {},
+      viewState: /** @type {import("../View.js").State} */ ({
+        rotation: 0
+      }),
+      viewHints: [],
+      wantedTiles: {},
+      declutterItems: []
+    };
 
-  /**
-   * @private
-   * @type {olx.FrameState}
-   */
-  this.frameState_ = {
-    animate: false,
-    coordinateToPixelTransform: _ol_transform_.create(),
-    extent: null,
-    focus: null,
-    index: 0,
-    layerStates: layerStates,
-    layerStatesArray: layerStatesArray,
-    pixelRatio: 1,
-    pixelToCoordinateTransform: _ol_transform_.create(),
-    postRenderFunctions: [],
-    size: [0, 0],
-    skippedFeatureUids: {},
-    tileQueue: this.tileQueue_,
-    time: Date.now(),
-    usedTiles: {},
-    viewState: /** @type {olx.ViewState} */ ({
-      rotation: 0
-    }),
-    viewHints: [],
-    wantedTiles: {}
-  };
+    this.setAttributions(function(frameState) {
+      const attributions = [];
+      for (let index = 0, iMax = options.sources.length; index < iMax; ++index) {
+        const sourceOrLayer = options.sources[index];
+        const source = sourceOrLayer instanceof Source ? sourceOrLayer : sourceOrLayer.getSource();
+        const attributionGetter = source.getAttributions();
+        if (typeof attributionGetter === 'function') {
+          const sourceAttribution = attributionGetter(frameState);
+          attributions.push.apply(attributions, sourceAttribution);
+        }
+      }
+      return attributions.length !== 0 ? attributions : null;
+    });
 
-  ImageSource.call(this, {});
-
-  if (options.operation !== undefined) {
-    this.setOperation(options.operation, options.lib);
-  }
-
-};
-
-inherits(RasterSource, ImageSource);
-
-
-/**
- * Set the operation.
- * @param {ol.RasterOperation} operation New operation.
- * @param {Object=} opt_lib Functions that will be available to operations run
- *     in a worker.
- * @api
- */
-RasterSource.prototype.setOperation = function(operation, opt_lib) {
-  this.worker_ = new Processor({
-    operation: operation,
-    imageOps: this.operationType_ === RasterOperationType.IMAGE,
-    queue: 1,
-    lib: opt_lib,
-    threads: this.threads_
-  });
-  this.changed();
-};
-
-
-/**
- * Update the stored frame state.
- * @param {ol.Extent} extent The view extent (in map units).
- * @param {number} resolution The view resolution.
- * @param {ol.proj.Projection} projection The view projection.
- * @return {olx.FrameState} The updated frame state.
- * @private
- */
-RasterSource.prototype.updateFrameState_ = function(extent, resolution, projection) {
-
-  const frameState = /** @type {olx.FrameState} */ (assign({}, this.frameState_));
-
-  frameState.viewState = /** @type {olx.ViewState} */ (assign({}, frameState.viewState));
-
-  const center = getCenter(extent);
-
-  frameState.extent = extent.slice();
-  frameState.focus = center;
-  frameState.size[0] = Math.round(getWidth(extent) / resolution);
-  frameState.size[1] = Math.round(getHeight(extent) / resolution);
-  frameState.time = Date.now();
-  frameState.animate = false;
-
-  const viewState = frameState.viewState;
-  viewState.center = center;
-  viewState.projection = projection;
-  viewState.resolution = resolution;
-  return frameState;
-};
-
-
-/**
- * Determine if all sources are ready.
- * @return {boolean} All sources are ready.
- * @private
- */
-RasterSource.prototype.allSourcesReady_ = function() {
-  let ready = true;
-  let source;
-  for (let i = 0, ii = this.renderers_.length; i < ii; ++i) {
-    source = this.renderers_[i].getLayer().getSource();
-    if (source.getState() !== SourceState.READY) {
-      ready = false;
-      break;
+    if (options.operation !== undefined) {
+      this.setOperation(options.operation, options.lib);
     }
-  }
-  return ready;
-};
 
-
-/**
- * @inheritDoc
- */
-RasterSource.prototype.getImage = function(extent, resolution, pixelRatio, projection) {
-  if (!this.allSourcesReady_()) {
-    return null;
   }
 
-  const frameState = this.updateFrameState_(extent, resolution, projection);
-  this.requestedFrameState_ = frameState;
+  /**
+   * Set the operation.
+   * @param {Operation} operation New operation.
+   * @param {Object=} opt_lib Functions that will be available to operations run
+   *     in a worker.
+   * @api
+   */
+  setOperation(operation, opt_lib) {
+    this.worker_ = new Processor({
+      operation: operation,
+      imageOps: this.operationType_ === RasterOperationType.IMAGE,
+      queue: 1,
+      lib: opt_lib,
+      threads: this.threads_
+    });
+    this.changed();
+  }
 
-  // check if we can't reuse the existing ol.ImageCanvas
-  if (this.renderedImageCanvas_) {
-    const renderedResolution = this.renderedImageCanvas_.getResolution();
-    const renderedExtent = this.renderedImageCanvas_.getExtent();
-    if (resolution !== renderedResolution || !equals(extent, renderedExtent)) {
-      this.renderedImageCanvas_ = null;
+  /**
+   * Update the stored frame state.
+   * @param {import("../extent.js").Extent} extent The view extent (in map units).
+   * @param {number} resolution The view resolution.
+   * @param {import("../proj/Projection.js").default} projection The view projection.
+   * @return {import("../PluggableMap.js").FrameState} The updated frame state.
+   * @private
+   */
+  updateFrameState_(extent, resolution, projection) {
+
+    const frameState = /** @type {import("../PluggableMap.js").FrameState} */ (assign({}, this.frameState_));
+
+    frameState.viewState = /** @type {import("../View.js").State} */ (assign({}, frameState.viewState));
+
+    const center = getCenter(extent);
+
+    frameState.extent = extent.slice();
+    frameState.size[0] = Math.round(getWidth(extent) / resolution);
+    frameState.size[1] = Math.round(getHeight(extent) / resolution);
+    frameState.time = Infinity;
+
+    const viewState = frameState.viewState;
+    viewState.center = center;
+    viewState.projection = projection;
+    viewState.resolution = resolution;
+    return frameState;
+  }
+
+  /**
+   * Determine if all sources are ready.
+   * @return {boolean} All sources are ready.
+   * @private
+   */
+  allSourcesReady_() {
+    let ready = true;
+    let source;
+    for (let i = 0, ii = this.layers_.length; i < ii; ++i) {
+      source = this.layers_[i].getSource();
+      if (source.getState() !== SourceState.READY) {
+        ready = false;
+        break;
+      }
     }
+    return ready;
   }
 
-  if (!this.renderedImageCanvas_ || this.getRevision() !== this.renderedRevision_) {
-    this.processSources_();
+  /**
+   * @inheritDoc
+   */
+  getImage(extent, resolution, pixelRatio, projection) {
+    if (!this.allSourcesReady_()) {
+      return null;
+    }
+
+    const frameState = this.updateFrameState_(extent, resolution, projection);
+    this.requestedFrameState_ = frameState;
+
+    // check if we can't reuse the existing ol/ImageCanvas
+    if (this.renderedImageCanvas_) {
+      const renderedResolution = this.renderedImageCanvas_.getResolution();
+      const renderedExtent = this.renderedImageCanvas_.getExtent();
+      if (resolution !== renderedResolution || !equals(extent, renderedExtent)) {
+        this.renderedImageCanvas_ = null;
+      }
+    }
+
+    if (!this.renderedImageCanvas_ || this.getRevision() !== this.renderedRevision_) {
+      this.processSources_();
+    }
+
+    frameState.tileQueue.loadMoreTiles(16, 16);
+
+    if (frameState.animate) {
+      requestAnimationFrame(this.changed.bind(this));
+    }
+
+    return this.renderedImageCanvas_;
   }
 
-  frameState.tileQueue.loadMoreTiles(16, 16);
+  /**
+   * Start processing source data.
+   * @private
+   */
+  processSources_() {
+    const frameState = this.requestedFrameState_;
+    const len = this.layers_.length;
+    const imageDatas = new Array(len);
+    for (let i = 0; i < len; ++i) {
+      frameState.layerIndex = i;
+      const imageData = getImageData(this.layers_[i], frameState);
+      if (imageData) {
+        imageDatas[i] = imageData;
+      } else {
+        return;
+      }
+    }
 
-  if (frameState.animate) {
-    requestAnimationFrame(this.changed.bind(this));
+    const data = {};
+    this.dispatchEvent(new RasterSourceEvent(RasterEventType.BEFOREOPERATIONS, frameState, data));
+    this.worker_.process(imageDatas, data, this.onWorkerComplete_.bind(this, frameState));
   }
 
-  return this.renderedImageCanvas_;
-};
-
-
-/**
- * Start processing source data.
- * @private
- */
-RasterSource.prototype.processSources_ = function() {
-  const frameState = this.requestedFrameState_;
-  const len = this.renderers_.length;
-  const imageDatas = new Array(len);
-  for (let i = 0; i < len; ++i) {
-    const imageData = getImageData(
-      this.renderers_[i], frameState, frameState.layerStatesArray[i]);
-    if (imageData) {
-      imageDatas[i] = imageData;
-    } else {
+  /**
+   * Called when pixel processing is complete.
+   * @param {import("../PluggableMap.js").FrameState} frameState The frame state.
+   * @param {Error} err Any error during processing.
+   * @param {ImageData} output The output image data.
+   * @param {Object} data The user data.
+   * @private
+   */
+  onWorkerComplete_(frameState, err, output, data) {
+    if (err || !output) {
       return;
     }
+
+    // do nothing if extent or resolution changed
+    const extent = frameState.extent;
+    const resolution = frameState.viewState.resolution;
+    if (resolution !== this.requestedFrameState_.viewState.resolution ||
+        !equals(extent, this.requestedFrameState_.extent)) {
+      return;
+    }
+
+    let context;
+    if (this.renderedImageCanvas_) {
+      context = this.renderedImageCanvas_.getImage().getContext('2d');
+    } else {
+      const width = Math.round(getWidth(extent) / resolution);
+      const height = Math.round(getHeight(extent) / resolution);
+      context = createCanvasContext2D(width, height);
+      this.renderedImageCanvas_ = new ImageCanvas(extent, resolution, 1, context.canvas);
+    }
+    context.putImageData(output, 0, 0);
+
+    this.changed();
+    this.renderedRevision_ = this.getRevision();
+
+    this.dispatchEvent(new RasterSourceEvent(RasterEventType.AFTEROPERATIONS, frameState, data));
   }
 
-  const data = {};
-  this.dispatchEvent(new RasterSource.Event(RasterEventType.BEFOREOPERATIONS, frameState, data));
-  this.worker_.process(imageDatas, data, this.onWorkerComplete_.bind(this, frameState));
-};
-
-
-/**
- * Called when pixel processing is complete.
- * @param {olx.FrameState} frameState The frame state.
- * @param {Error} err Any error during processing.
- * @param {ImageData} output The output image data.
- * @param {Object} data The user data.
- * @private
- */
-RasterSource.prototype.onWorkerComplete_ = function(frameState, err, output, data) {
-  if (err || !output) {
-    return;
+  /**
+   * @override
+   */
+  getImageInternal() {
+    return null; // not implemented
   }
-
-  // do nothing if extent or resolution changed
-  const extent = frameState.extent;
-  const resolution = frameState.viewState.resolution;
-  if (resolution !== this.requestedFrameState_.viewState.resolution ||
-      !equals(extent, this.requestedFrameState_.extent)) {
-    return;
-  }
-
-  let context;
-  if (this.renderedImageCanvas_) {
-    context = this.renderedImageCanvas_.getImage().getContext('2d');
-  } else {
-    const width = Math.round(getWidth(extent) / resolution);
-    const height = Math.round(getHeight(extent) / resolution);
-    context = createCanvasContext2D(width, height);
-    this.renderedImageCanvas_ = new ImageCanvas(extent, resolution, 1, context.canvas);
-  }
-  context.putImageData(output, 0, 0);
-
-  this.changed();
-  this.renderedRevision_ = this.getRevision();
-
-  this.dispatchEvent(new RasterSource.Event(RasterEventType.AFTEROPERATIONS, frameState, data));
-};
+}
 
 
 /**
@@ -335,18 +426,35 @@ let sharedContext = null;
 
 
 /**
- * Get image data from a renderer.
- * @param {ol.renderer.canvas.Layer} renderer Layer renderer.
- * @param {olx.FrameState} frameState The frame state.
- * @param {ol.LayerState} layerState The layer state.
+ * Get image data from a layer.
+ * @param {import("../layer/Layer.js").default} layer Layer to render.
+ * @param {import("../PluggableMap.js").FrameState} frameState The frame state.
  * @return {ImageData} The image data.
  */
-function getImageData(renderer, frameState, layerState) {
-  if (!renderer.prepareFrame(frameState, layerState)) {
+function getImageData(layer, frameState) {
+  const renderer = layer.getRenderer();
+  if (!renderer) {
+    throw new Error('Unsupported layer type: ' + layer);
+  }
+
+  if (!renderer.prepareFrame(frameState)) {
     return null;
   }
   const width = frameState.size[0];
   const height = frameState.size[1];
+  const container = renderer.renderFrame(frameState, null);
+  let element;
+  if (container) {
+    element = container.firstElementChild;
+  }
+  if (!(element instanceof HTMLCanvasElement)) {
+    throw new Error('Unsupported rendered element: ' + element);
+  }
+  if (element.width === width && element.height === height) {
+    const context = element.getContext('2d');
+    return context.getImageData(0, 0, width, height);
+  }
+
   if (!sharedContext) {
     sharedContext = createCanvasContext2D(width, height);
   } else {
@@ -357,123 +465,57 @@ function getImageData(renderer, frameState, layerState) {
       sharedContext.clearRect(0, 0, width, height);
     }
   }
-  renderer.composeFrame(frameState, layerState, sharedContext);
+  sharedContext.drawImage(element, 0, 0, width, height);
   return sharedContext.getImageData(0, 0, width, height);
 }
 
 
 /**
- * Get a list of layer states from a list of renderers.
- * @param {Array.<ol.renderer.canvas.Layer>} renderers Layer renderers.
- * @return {Array.<ol.LayerState>} The layer states.
+ * Get a list of layer states from a list of layers.
+ * @param {Array<import("../layer/Layer.js").default>} layers Layers.
+ * @return {Array<import("../layer/Layer.js").State>} The layer states.
  */
-function getLayerStatesArray(renderers) {
-  return renderers.map(function(renderer) {
-    return renderer.getLayer().getLayerState();
+function getLayerStatesArray(layers) {
+  return layers.map(function(layer) {
+    return layer.getLayerState();
   });
 }
 
 
 /**
- * Create renderers for all sources.
- * @param {Array.<ol.source.Source>} sources The sources.
- * @return {Array.<ol.renderer.canvas.Layer>} Array of layer renderers.
+ * Create layers for all sources.
+ * @param {Array<import("./Source.js").default|import("../layer/Layer.js").default>} sources The sources.
+ * @return {Array<import("../layer/Layer.js").default>} Array of layers.
  */
-function createRenderers(sources) {
+function createLayers(sources) {
   const len = sources.length;
-  const renderers = new Array(len);
+  const layers = new Array(len);
   for (let i = 0; i < len; ++i) {
-    renderers[i] = createRenderer(sources[i]);
+    layers[i] = createLayer(sources[i]);
   }
-  return renderers;
+  return layers;
 }
 
 
 /**
- * Create a renderer for the provided source.
- * @param {ol.source.Source} source The source.
- * @return {ol.renderer.canvas.Layer} The renderer.
+ * Create a layer for the provided source.
+ * @param {import("./Source.js").default|import("../layer/Layer.js").default} layerOrSource The layer or source.
+ * @return {import("../layer/Layer.js").default} The layer.
  */
-function createRenderer(source) {
-  let renderer = null;
-  if (source instanceof TileSource) {
-    renderer = createTileRenderer(source);
-  } else if (source instanceof ImageSource) {
-    renderer = createImageRenderer(source);
+function createLayer(layerOrSource) {
+  // @type {import("../layer/Layer.js").default}
+  let layer;
+  if (layerOrSource instanceof Source) {
+    if (layerOrSource instanceof TileSource) {
+      layer = new TileLayer({source: layerOrSource});
+    } else if (layerOrSource instanceof ImageSource) {
+      layer = new ImageLayer({source: layerOrSource});
+    }
+  } else {
+    layer = layerOrSource;
   }
-  return renderer;
+  return layer;
 }
-
-
-/**
- * Create an image renderer for the provided source.
- * @param {ol.source.Image} source The source.
- * @return {ol.renderer.canvas.Layer} The renderer.
- */
-function createImageRenderer(source) {
-  const layer = new ImageLayer({source: source});
-  return new CanvasImageLayerRenderer(layer);
-}
-
-
-/**
- * Create a tile renderer for the provided source.
- * @param {ol.source.Tile} source The source.
- * @return {ol.renderer.canvas.Layer} The renderer.
- */
-function createTileRenderer(source) {
-  const layer = new TileLayer({source: source});
-  return new CanvasTileLayerRenderer(layer);
-}
-
-
-/**
- * @classdesc
- * Events emitted by {@link ol.source.Raster} instances are instances of this
- * type.
- *
- * @constructor
- * @extends {ol.events.Event}
- * @implements {oli.source.RasterEvent}
- * @param {string} type Type.
- * @param {olx.FrameState} frameState The frame state.
- * @param {Object} data An object made available to operations.
- */
-RasterSource.Event = function(type, frameState, data) {
-  Event.call(this, type);
-
-  /**
-   * The raster extent.
-   * @type {ol.Extent}
-   * @api
-   */
-  this.extent = frameState.extent;
-
-  /**
-   * The pixel resolution (map units per pixel).
-   * @type {number}
-   * @api
-   */
-  this.resolution = frameState.viewState.resolution / frameState.pixelRatio;
-
-  /**
-   * An object made available to all operations.  This can be used by operations
-   * as a storage object (e.g. for calculating statistics).
-   * @type {Object}
-   * @api
-   */
-  this.data = data;
-
-};
-inherits(RasterSource.Event, Event);
-
-
-/**
- * @override
- */
-RasterSource.prototype.getImageInternal = function() {
-  return null; // not implemented
-};
 
 
 export default RasterSource;

@@ -6,7 +6,7 @@ import {isEmpty} from '../obj.js';
 
 /**
  * @private
- * @type {Object.<string, Object.<string, ol.TransformFunction>>}
+ * @type {!Object<string, Object<string, import("../proj.js").TransformFunction>>}
  */
 let transforms = {};
 
@@ -23,9 +23,9 @@ export function clear() {
  * Registers a conversion function to convert coordinates from the source
  * projection to the destination projection.
  *
- * @param {ol.proj.Projection} source Source.
- * @param {ol.proj.Projection} destination Destination.
- * @param {ol.TransformFunction} transformFn Transform.
+ * @param {import("./Projection.js").default} source Source.
+ * @param {import("./Projection.js").default} destination Destination.
+ * @param {import("../proj.js").TransformFunction} transformFn Transform.
  */
 export function add(source, destination, transformFn) {
   const sourceCode = source.getCode();
@@ -42,9 +42,9 @@ export function add(source, destination, transformFn) {
  * projection to the destination projection.  This method is used to clean up
  * cached transforms during testing.
  *
- * @param {ol.proj.Projection} source Source projection.
- * @param {ol.proj.Projection} destination Destination projection.
- * @return {ol.TransformFunction} transformFn The unregistered transform.
+ * @param {import("./Projection.js").default} source Source projection.
+ * @param {import("./Projection.js").default} destination Destination projection.
+ * @return {import("../proj.js").TransformFunction} transformFn The unregistered transform.
  */
 export function remove(source, destination) {
   const sourceCode = source.getCode();
@@ -62,7 +62,7 @@ export function remove(source, destination) {
  * Get a transform given a source code and a destination code.
  * @param {string} sourceCode The code for the source projection.
  * @param {string} destinationCode The code for the destination projection.
- * @return {ol.TransformFunction|undefined} The transform function (if found).
+ * @return {import("../proj.js").TransformFunction|undefined} The transform function (if found).
  */
 export function get(sourceCode, destinationCode) {
   let transform;

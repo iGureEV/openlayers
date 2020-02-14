@@ -2,11 +2,16 @@ import Map from '../../../../src/ol/Map.js';
 import TileState from '../../../../src/ol/TileState.js';
 import View from '../../../../src/ol/View.js';
 import ImageLayer from '../../../../src/ol/layer/Image.js';
+import VectorImageLayer from '../../../../src/ol/layer/VectorImage.js';
 import Projection from '../../../../src/ol/proj/Projection.js';
 import Static from '../../../../src/ol/source/ImageStatic.js';
 import RasterSource from '../../../../src/ol/source/Raster.js';
 import Source from '../../../../src/ol/source/Source.js';
 import TileSource from '../../../../src/ol/source/Tile.js';
+import VectorSource from '../../../../src/ol/source/Vector.js';
+import Feature from '../../../../src/ol/Feature.js';
+import Point from '../../../../src/ol/geom/Point.js';
+import {Style, Circle, Fill} from '../../../../src/ol/style.js';
 import XYZ from '../../../../src/ol/source/XYZ.js';
 
 const red = 'data:image/gif;base64,R0lGODlhAQABAPAAAP8AAP///yH5BAAAAAAALAAAAAA' +
@@ -14,9 +19,6 @@ const red = 'data:image/gif;base64,R0lGODlhAQABAPAAAP8AAP///yH5BAAAAAAALAAAAAA' 
 
 const green = 'data:image/gif;base64,R0lGODlhAQABAPAAAAD/AP///yH5BAAAAAAALAAAA' +
     'AABAAEAAAICRAEAOw==';
-
-const blue = 'data:image/gif;base64,R0lGODlhAQABAPAAAAAA/////yH5BAAAAAAALAAAAA' +
-    'ABAAEAAAICRAEAOw==';
 
 where('Uint8ClampedArray').describe('ol.source.Raster', function() {
 
@@ -37,17 +39,26 @@ where('Uint8ClampedArray').describe('ol.source.Raster', function() {
 
     redSource = new Static({
       url: red,
-      imageExtent: extent
+      imageExtent: extent,
+      attributions: ['red raster source']
     });
 
     greenSource = new Static({
       url: green,
-      imageExtent: extent
+      imageExtent: extent,
+      attributions: ['green raster source']
     });
 
-    blueSource = new Static({
-      url: blue,
-      imageExtent: extent
+    blueSource = new VectorImageLayer({
+      source: new VectorSource({
+        features: [new Feature(new Point([0, 0]))]
+      }),
+      style: new Style({
+        image: new Circle({
+          radius: 3,
+          fill: new Fill({color: 'blue'})
+        })
+      })
     });
 
     raster = new RasterSource({
@@ -89,7 +100,7 @@ where('Uint8ClampedArray').describe('ol.source.Raster', function() {
 
   describe('constructor', function() {
 
-    it('returns a tile source', function() {
+    it('returns a raster source', function() {
       const source = new RasterSource({
         threads: 0,
         sources: [new TileSource({})]
@@ -154,6 +165,54 @@ where('Uint8ClampedArray').describe('ol.source.Raster', function() {
       view.setCenter([0, 0]);
       view.setZoom(0);
 
+    });
+
+  });
+
+  describe('config option `attributions`', function() {
+    it('handles empty attributions', function() {
+      const blue = new RasterSource({
+        operationType: 'image',
+        threads: 0,
+        sources: [blueSource],
+        operation: function(inputs) {
+          return inputs[0];
+        }
+      });
+      const blueAttributions = blue.getAttributions();
+      expect(blueAttributions()).to.be(null);
+    });
+
+    it('shows single attributions', function() {
+      const red = new RasterSource({
+        operationType: 'image',
+        threads: 0,
+        sources: [redSource],
+        operation: function(inputs) {
+          return inputs[0];
+        }
+      });
+      const redAttribtuions = red.getAttributions();
+
+      expect(redAttribtuions()).to.not.be(null);
+      expect(typeof redAttribtuions).to.be('function');
+      expect(redAttribtuions()).to.eql(['red raster source']);
+    });
+
+    it('concatinates multiple attributions', function() {
+      const redGreen = new RasterSource({
+        operationType: 'image',
+        threads: 0,
+        sources: [redSource, greenSource],
+        operation: function(inputs) {
+          return inputs[0];
+        }
+      });
+      const redGreenAttributions = redGreen.getAttributions();
+
+      expect(redGreenAttributions()).to.not.be(null);
+      expect(typeof redGreenAttributions).to.be('function');
+      expect(redGreenAttributions()).to.eql(['red raster source', 'green raster source']);
     });
 
   });
@@ -343,7 +402,7 @@ where('Uint8ClampedArray').describe('ol.source.Raster', function() {
       map2.once('moveend', function() {
         expect(tileCache.getCount()).to.equal(1);
         const state = tileCache.peekLast().getState();
-        expect(state === TileState.LOADED || state === TileState.LOADED).to.be(true);
+        expect(state === TileState.LOADING || state === TileState.LOADED).to.be(true);
         done();
       });
 

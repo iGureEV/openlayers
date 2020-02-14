@@ -1,4 +1,12 @@
 import {
+  useGeographic,
+  getUserProjection,
+  setUserProjection,
+  clearUserProjection,
+  toUserCoordinate,
+  fromUserCoordinate,
+  toUserExtent,
+  fromUserExtent,
   addCommon,
   clearAllProjections,
   equivalent,
@@ -9,11 +17,12 @@ import {
   toLonLat,
   getTransform,
   getPointResolution,
-  getTransformFromProjections
+  getTransformFromProjections,
+  METERS_PER_UNIT
 } from '../../../src/ol/proj.js';
 import {register} from '../../../src/ol/proj/proj4.js';
 import {HALF_SIZE} from '../../../src/ol/proj/epsg3857.js';
-import {METERS_PER_UNIT} from '../../../src/ol/proj/epsg4326.js';
+import {METERS_PER_UNIT as metersPerDegree} from '../../../src/ol/proj/epsg4326.js';
 import Projection from '../../../src/ol/proj/Projection.js';
 
 
@@ -21,7 +30,112 @@ describe('ol.proj', function() {
 
   afterEach(function() {
     clearAllProjections();
+    clearUserProjection();
     addCommon();
+  });
+
+  describe('useGeographic()', function() {
+    it('sets the user projection to Geographic/WGS-84', function() {
+      useGeographic();
+      const projection = getUserProjection();
+      expect(projection).to.be(getProjection('EPSG:4326'));
+    });
+  });
+
+  describe('getUserProjection()', function() {
+    it('returns null by default', function() {
+      expect(getUserProjection()).to.be(null);
+    });
+
+    it('returns the user projection if set', function() {
+      const projection = getProjection('EPSG:4326');
+      setUserProjection(projection);
+      expect(getUserProjection()).to.be(projection);
+    });
+  });
+
+  describe('setUserProjection()', function() {
+    it('accepts a string identifier', function() {
+      const projection = getProjection('EPSG:4326');
+      setUserProjection('EPSG:4326');
+      expect(getUserProjection()).to.be(projection);
+    });
+  });
+
+  describe('clearUserProjection()', function() {
+    it('clears the user projection', function() {
+      useGeographic();
+      clearUserProjection();
+      expect(getUserProjection()).to.be(null);
+    });
+  });
+
+  describe('toUserCoordinate()', function() {
+    it('transforms a point to the user projection', function() {
+      useGeographic();
+      const coordinate = fromLonLat([-110, 45]);
+      const user = toUserCoordinate(coordinate, 'EPSG:3857');
+      const transformed = transform(coordinate, 'EPSG:3857', 'EPSG:4326');
+      expect(user).to.eql(transformed);
+      expect(user).not.to.eql(coordinate);
+    });
+
+    it('returns the original if no user projection is set', function() {
+      const coordinate = fromLonLat([-110, 45]);
+      const user = toUserCoordinate(coordinate, 'EPSG:3857');
+      expect(user).to.be(coordinate);
+    });
+  });
+
+  describe('fromUserCoordinate()', function() {
+    it('transforms a point from the user projection', function() {
+      useGeographic();
+      const user = [-110, 45];
+      const coordinate = fromUserCoordinate(user, 'EPSG:3857');
+      const transformed = transform(user, 'EPSG:4326', 'EPSG:3857');
+      expect(coordinate).to.eql(transformed);
+      expect(user).not.to.eql(coordinate);
+    });
+
+    it('returns the original if no user projection is set', function() {
+      const user = fromLonLat([-110, 45]);
+      const coordinate = fromUserCoordinate(user, 'EPSG:3857');
+      expect(coordinate).to.be(user);
+    });
+  });
+
+  describe('toUserExtent()', function() {
+    it('transforms an extent to the user projection', function() {
+      useGeographic();
+      const extent = transformExtent([-110, 45, -100, 50], 'EPSG:4326', 'EPSG:3857');
+      const user = toUserExtent(extent, 'EPSG:3857');
+      const transformed = transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
+      expect(user).to.eql(transformed);
+      expect(user).not.to.eql(extent);
+    });
+
+    it('returns the original if no user projection is set', function() {
+      const extent = transformExtent([-110, 45, -100, 50], 'EPSG:4326', 'EPSG:3857');
+      const user = toUserExtent(extent, 'EPSG:3857');
+      expect(user).to.be(extent);
+    });
+  });
+
+  describe('fromUserExtent()', function() {
+    it('transforms an extent from the user projection', function() {
+      useGeographic();
+      const user = [-110, 45, -100, 50];
+      const extent = fromUserExtent(user, 'EPSG:3857');
+      const transformed = transformExtent(user, 'EPSG:4326', 'EPSG:3857');
+      expect(extent).to.eql(transformed);
+      expect(extent).not.to.eql(user);
+    });
+
+    it('returns the original if no user projection is set', function() {
+      const user = transformExtent([-110, 45, -100, 50], 'EPSG:4326', 'EPSG:3857');
+      const extent = fromUserExtent(user, 'EPSG:3857');
+      expect(extent).to.be(user);
+    });
   });
 
   describe('toLonLat()', function() {
@@ -268,7 +382,7 @@ describe('ol.proj', function() {
       expect(pointResolution).to.roughlyEqual(0.615661, 1e-5);
     });
     it('returns the correct point resolution for EPSG:3857 with custom units', function() {
-      let pointResolution = getPointResolution('EPSG:3857', 1, [0, 0], 'degrees');
+      let pointResolution = getPointResolution('EPSG:3857', METERS_PER_UNIT['degrees'], [0, 0], 'degrees');
       expect(pointResolution).to.be(1);
       pointResolution = getPointResolution('EPSG:4326', 1, fromLonLat([0, 52]), 'degrees');
       expect(pointResolution).to.be(1);
@@ -600,7 +714,7 @@ describe('ol.proj', function() {
 
     it('returns value in meters', function() {
       const epsg4326 = getProjection('EPSG:4326');
-      expect(epsg4326.getMetersPerUnit()).to.eql(METERS_PER_UNIT);
+      expect(epsg4326.getMetersPerUnit()).to.eql(metersPerDegree);
     });
 
     it('works for proj4js projections without units', function() {

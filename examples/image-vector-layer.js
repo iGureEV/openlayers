@@ -1,12 +1,10 @@
 import Map from '../src/ol/Map.js';
 import View from '../src/ol/View.js';
 import GeoJSON from '../src/ol/format/GeoJSON.js';
+import VectorImageLayer from '../src/ol/layer/VectorImage.js';
 import VectorLayer from '../src/ol/layer/Vector.js';
 import VectorSource from '../src/ol/source/Vector.js';
-import Fill from '../src/ol/style/Fill.js';
-import Stroke from '../src/ol/style/Stroke.js';
-import Style from '../src/ol/style/Style.js';
-import Text from '../src/ol/style/Text.js';
+import {Fill, Stroke, Style, Text} from '../src/ol/style.js';
 
 
 const style = new Style({
@@ -22,8 +20,8 @@ const style = new Style({
 
 const map = new Map({
   layers: [
-    new VectorLayer({
-      renderMode: 'image',
+    new VectorImageLayer({
+      imageRatio: 2,
       source: new VectorSource({
         url: 'data/geojson/countries.geojson',
         format: new GeoJSON()
@@ -58,35 +56,32 @@ const featureOverlay = new VectorLayer({
 let highlight;
 const displayFeatureInfo = function(pixel) {
 
-  const feature = map.forEachFeatureAtPixel(pixel, function(feature) {
-    return feature;
-  });
+  map.getLayers().item(0).getFeatures(pixel).then(function(features) {
+    const feature = features.length > 0 ? features[0] : undefined;
 
-  const info = document.getElementById('info');
-  if (feature) {
-    info.innerHTML = feature.getId() + ': ' + feature.get('name');
-  } else {
-    info.innerHTML = '&nbsp;';
-  }
-
-  if (feature !== highlight) {
-    if (highlight) {
-      featureOverlay.getSource().removeFeature(highlight);
-    }
+    const info = document.getElementById('info');
     if (feature) {
-      featureOverlay.getSource().addFeature(feature);
+      info.innerHTML = feature.getId() + ': ' + feature.get('name');
+    } else {
+      info.innerHTML = '&nbsp;';
     }
-    highlight = feature;
-  }
 
+    if (feature !== highlight) {
+      if (highlight) {
+        featureOverlay.getSource().removeFeature(highlight);
+      }
+      if (feature) {
+        featureOverlay.getSource().addFeature(feature);
+      }
+      highlight = feature;
+    }
+  });
 };
 
 map.on('pointermove', function(evt) {
-  if (evt.dragging) {
-    return;
+  if (!evt.dragging) {
+    displayFeatureInfo(evt.pixel);
   }
-  const pixel = map.getEventPixel(evt.originalEvent);
-  displayFeatureInfo(pixel);
 });
 
 map.on('click', function(evt) {

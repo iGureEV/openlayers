@@ -6,6 +6,16 @@ import {clamp} from './math.js';
 
 
 /**
+ * A color represented as a short array [red, green, blue, alpha].
+ * red, green, and blue should be integers in the range 0..255 inclusive.
+ * alpha should be a float in the range 0..1 inclusive. If no alpha value is
+ * given then `1` will be used.
+ * @typedef {Array<number>} Color
+ * @api
+ */
+
+
+/**
  * This RegExp matches # followed by 3, 4, 6, or 8 hex digits.
  * @const
  * @type {RegExp}
@@ -20,12 +30,12 @@ const HEX_COLOR_RE_ = /^#([a-f0-9]{3}|[a-f0-9]{4}(?:[a-f0-9]{2}){0,2})$/i;
  * @type {RegExp}
  * @private
  */
-const NAMED_COLOR_RE_ = /^([a-z]*)$/i;
+const NAMED_COLOR_RE_ = /^([a-z]*)$|^hsla?\(.*\)$/i;
 
 
 /**
  * Return the color as an rgba string.
- * @param {ol.Color|string} color Color.
+ * @param {Color|string} color Color.
  * @return {string} Rgba string.
  * @api
  */
@@ -58,7 +68,7 @@ function fromNamed(color) {
 
 /**
  * @param {string} s String.
- * @return {ol.Color} Color.
+ * @return {Color} Color.
  */
 export const fromString = (
   function() {
@@ -74,7 +84,7 @@ export const fromString = (
     const MAX_CACHE_SIZE = 1024;
 
     /**
-     * @type {Object.<string, ol.Color>}
+     * @type {Object<string, Color>}
      */
     const cache = {};
 
@@ -86,7 +96,7 @@ export const fromString = (
     return (
       /**
        * @param {string} s String.
-       * @return {ol.Color} Color.
+       * @return {Color} Color.
        */
       function(s) {
         let color;
@@ -115,22 +125,22 @@ export const fromString = (
 /**
  * Return the color as an array. This function maintains a cache of calculated
  * arrays which means the result should not be modified.
- * @param {ol.Color|string} color Color.
- * @return {ol.Color} Color.
+ * @param {Color|string} color Color.
+ * @return {Color} Color.
  * @api
  */
 export function asArray(color) {
   if (Array.isArray(color)) {
     return color;
   } else {
-    return fromString(/** @type {string} */ (color));
+    return fromString(color);
   }
 }
 
 /**
  * @param {string} s String.
  * @private
- * @return {ol.Color} Color.
+ * @return {Color} Color.
  */
 function fromStringInternal_(s) {
   let r, g, b, a, color;
@@ -175,14 +185,14 @@ function fromStringInternal_(s) {
   } else {
     assert(false, 14); // Invalid color
   }
-  return /** @type {ol.Color} */ (color);
+  return color;
 }
 
 
 /**
  * TODO this function is only used in the test, we probably shouldn't export it
- * @param {ol.Color} color Color.
- * @return {ol.Color} Clamped color.
+ * @param {Color} color Color.
+ * @return {Color} Clamped color.
  */
 export function normalize(color) {
   color[0] = clamp((color[0] + 0.5) | 0, 0, 255);
@@ -194,7 +204,7 @@ export function normalize(color) {
 
 
 /**
- * @param {ol.Color} color Color.
+ * @param {Color} color Color.
  * @return {string} String.
  */
 export function toString(color) {
@@ -212,4 +222,15 @@ export function toString(color) {
   }
   const a = color[3] === undefined ? 1 : color[3];
   return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
+/**
+ * @param {string} s String.
+ * @return {boolean} Whether the string is actually a valid color
+ */
+export function isStringColor(s) {
+  if (NAMED_COLOR_RE_.test(s)) {
+    s = fromNamed(s);
+  }
+  return HEX_COLOR_RE_.test(s) || s.indexOf('rgba(') === 0 || s.indexOf('rgb(') === 0;
 }
